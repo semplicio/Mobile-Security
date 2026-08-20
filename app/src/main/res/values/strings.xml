@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutomBot Security</string>
+    <string name="settings_title">Configurações</string>
+
+    <string name="status_protected">Aparelho protegido</string>
+    <string name="status_unprotected">Proteção desativada</string>
+    <string name="switch_enable_protection">Ativar proteção antifurto</string>
+
+    <string name="btn_find_device">Tocar alarme (achar aparelho)</string>
+    <string name="btn_stop_alarm">Parar alarme</string>
+    <string name="btn_settings">Configurações</string>
+    <string name="btn_save">Salvar</string>
+
+    <string name="label_threshold">Tentativas erradas até disparar o alerta</string>
+    <string name="hint_threshold">Ex: 2</string>
+    <string name="label_dest_email">E-mail que vai receber os alertas</string>
+    <string name="hint_dest_email">seuemail@exemplo.com</string>
+    <string name="label_smtp_section">Conta de envio (SMTP)</string>
+    <string name="hint_smtp_host">smtp.gmail.com</string>
+    <string name="hint_smtp_port">587</string>
+    <string name="hint_smtp_user">conta usada para enviar o alerta</string>
+    <string name="hint_smtp_pass">senha de app</string>
+    <string name="smtp_help_text">Se usar Gmail, gere uma "senha de app" em myaccount.google.com/apppasswords — a senha normal da conta não funciona aqui.</string>
+
+    <string name="device_admin_explanation">O AutomBot Security precisa ser administrador do dispositivo para detectar tentativas erradas de desbloqueio da tela.</string>
+
+    <string name="notification_channel_name">Monitoramento AutomBot Security</string>
+    <string name="notification_monitoring_title">AutomBot Security ativo</string>
+    <string name="notification_monitoring_text">Monitorando tentativas de acesso ao aparelho</string>
+</resources>

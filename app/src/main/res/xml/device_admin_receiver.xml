@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- Precisamos apenas observar tentativas de senha, não bloquear/apagar nada -->
+        <watch-login />
+    </uses-policies>
+</device-admin>
