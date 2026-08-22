@@ -26,6 +26,10 @@ class SettingsActivity : AppCompatActivity() {
             binding.etPhotoCount.isEnabled = enabled
         }
 
+        binding.btnExperimentalFeatures.setOnClickListener {
+            startActivity(Intent(this, ExperimentalFeaturesActivity::class.java))
+        }
+
         binding.btnTestAlert.setOnClickListener {
             saveValues()
             val intent = Intent(this, SecurityMonitorService::class.java).apply {
