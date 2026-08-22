@@ -3,6 +3,18 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val smtpUser = providers.gradleProperty("AUTOMBOT_SMTP_USER")
+    .orElse(providers.environmentVariable("AUTOMBOT_SMTP_USER"))
+    .orElse("")
+    .get()
+val smtpPassword = providers.gradleProperty("AUTOMBOT_SMTP_PASSWORD")
+    .orElse(providers.environmentVariable("AUTOMBOT_SMTP_PASSWORD"))
+    .orElse("")
+    .get()
+
+fun quoteBuildConfig(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     namespace = "com.autombot.security"
     compileSdk = 34
@@ -15,6 +27,11 @@ android {
         versionName = "0.1.0-base"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SMTP_HOST", quoteBuildConfig("smtp.hostinger.com"))
+        buildConfigField("int", "SMTP_PORT", "465")
+        buildConfigField("String", "SMTP_USER", quoteBuildConfig(smtpUser))
+        buildConfigField("String", "SMTP_PASSWORD", quoteBuildConfig(smtpPassword))
     }
 
     buildTypes {
@@ -33,6 +50,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     packaging {
@@ -52,15 +70,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.8.3")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
-    // Câmera (captura da foto do intruso)
     implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")
 
-    // Localização (achar o aparelho perdido)
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
-    // Envio de e-mail via SMTP direto do aparelho
     implementation("com.sun.mail:android-mail:1.6.7")
     implementation("com.sun.mail:android-activation:1.6.7")
 
