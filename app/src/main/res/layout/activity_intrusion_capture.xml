@@ -13,8 +13,8 @@
         android:padding="28dp">
 
         <ImageView
-            android:layout_width="92dp"
-            android:layout_height="92dp"
+            android:layout_width="104dp"
+            android:layout_height="104dp"
             android:src="@drawable/ic_shield"
             android:contentDescription="@null" />
 
@@ -22,18 +22,18 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="AUTOMBOT SECURITY"
+            android:text="AUTOMBOT"
             android:textColor="#6EE7FF"
-            android:textSize="14sp"
+            android:textSize="15sp"
             android:textStyle="bold"
-            android:letterSpacing="0.14" />
+            android:letterSpacing="0.16" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="12dp"
             android:gravity="center"
-            android:text="Incidente de segurança"
+            android:text="Tecnologia que trabalha por você"
             android:textColor="#FFFFFF"
             android:textSize="30sp"
             android:textStyle="bold" />
@@ -42,30 +42,31 @@
             android:id="@+id/tvSecurityMessage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
             android:gravity="center"
-            android:textColor="#FFFFFF"
+            android:text="Tecnologia, automação e soluções inteligentes para proteger e simplificar seu dia a dia."
+            android:textColor="#DDE7F2"
             android:textSize="16sp" />
 
         <TextView
             android:id="@+id/tvDetail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="18dp"
             android:gravity="center"
-            android:text="Registrando as evidências habilitadas pelo proprietário."
-            android:textColor="#B7C8DB"
-            android:textSize="15sp" />
+            android:text="autombot.com.br"
+            android:textColor="#6EE7FF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvRecordingIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="26dp"
             android:gravity="center"
-            android:text="Preparando registro…"
-            android:textColor="#62F5B7"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:text="Proteção ativa • registro de evidências em andamento"
+            android:textColor="#B7C8DB"
+            android:textSize="12sp" />
     </LinearLayout>
 </FrameLayout>
