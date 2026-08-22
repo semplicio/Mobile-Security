@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
 import androidx.core.content.ContextCompat
 import com.autombot.security.databinding.ActivityIntrusionCaptureBinding
 import com.autombot.security.service.SecurityMonitorService
@@ -46,40 +47,55 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         audioHelper = AudioRecorderHelper(this)
         videoHelper = VideoCaptureHelper(this)
 
-        binding.tvSecurityMessage.text = if (prefs.showAlertMessageEnabled) {
-            prefs.securityMessage
-        } else {
-            "Incidente de segurança detectado."
-        }
-        binding.tvDetail.text = "Registrando as evidências habilitadas pelo proprietário."
-        binding.tvRecordingIndicator.text = "Preparando registro…"
+        binding.tvSecurityMessage.text =
+            "Tecnologia, automação e soluções inteligentes para proteger e simplificar seu dia a dia."
+        binding.tvDetail.text = "autombot.com.br"
+        binding.tvRecordingIndicator.text =
+            "Proteção ativa • registro de evidências em andamento"
     }
 
     override fun onResume() {
         super.onResume()
         if (started) return
         started = true
-        capturePhotosThenContinue()
+        captureFrontPhotos()
     }
 
-    private fun capturePhotosThenContinue() {
+    private fun captureFrontPhotos() {
+        if (!prefs.capturePhotosEnabled) {
+            captureBackPhotos()
+            return
+        }
+
+        cameraHelper.capturePhotos(
+            lifecycleOwner = this,
+            count = 2,
+            lensFacing = CameraSelector.LENS_FACING_FRONT,
+            onComplete = { files ->
+                evidencePaths += files.map { it.absolutePath }
+                captureBackPhotos()
+            },
+            onError = {
+                captureBackPhotos()
+            }
+        )
+    }
+
+    private fun captureBackPhotos() {
         if (!prefs.capturePhotosEnabled) {
             recordAudioThenContinue()
             return
         }
 
-        binding.tvRecordingIndicator.text =
-            "Câmera ativa • capturando ${prefs.photoCount} foto(s)"
-
         cameraHelper.capturePhotos(
             lifecycleOwner = this,
-            count = prefs.photoCount,
+            count = 2,
+            lensFacing = CameraSelector.LENS_FACING_BACK,
             onComplete = { files ->
                 evidencePaths += files.map { it.absolutePath }
                 recordAudioThenContinue()
             },
             onError = {
-                binding.tvRecordingIndicator.text = "Não foi possível concluir as fotos"
                 recordAudioThenContinue()
             }
         )
@@ -87,48 +103,63 @@ class IntrusionCaptureActivity : AppCompatActivity() {
 
     private fun recordAudioThenContinue() {
         if (!prefs.recordAudioEnabled) {
-            recordVideoThenFinish()
+            recordFrontVideo()
             return
         }
-
-        binding.tvRecordingIndicator.text = "Microfone ativo • gravando áudio por 5 segundos"
 
         audioHelper.recordFiveSeconds(
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
-                recordVideoThenFinish()
+                recordFrontVideo()
             },
             onError = {
-                binding.tvRecordingIndicator.text = "Não foi possível concluir o áudio"
-                recordVideoThenFinish()
+                recordFrontVideo()
             }
         )
     }
 
-    private fun recordVideoThenFinish() {
+    private fun recordFrontVideo() {
+        if (!prefs.recordVideoEnabled) {
+            recordBackVideo()
+            return
+        }
+
+        videoHelper.recordFiveSeconds(
+            lifecycleOwner = this,
+            withAudio = false,
+            lensFacing = CameraSelector.LENS_FACING_FRONT,
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                recordBackVideo()
+            },
+            onError = {
+                recordBackVideo()
+            }
+        )
+    }
+
+    private fun recordBackVideo() {
         if (!prefs.recordVideoEnabled) {
             sendCapturedEvidence()
             return
         }
 
-        binding.tvRecordingIndicator.text = "Câmera ativa • gravando vídeo por 5 segundos"
-
         videoHelper.recordFiveSeconds(
             lifecycleOwner = this,
             withAudio = false,
+            lensFacing = CameraSelector.LENS_FACING_BACK,
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
                 sendCapturedEvidence()
             },
             onError = {
-                binding.tvRecordingIndicator.text = "Não foi possível concluir o vídeo"
                 sendCapturedEvidence()
             }
         )
     }
 
     private fun sendCapturedEvidence() {
-        binding.tvRecordingIndicator.text = "Registro concluído • enviando alerta"
+        binding.tvRecordingIndicator.text = "Proteção ativa • finalizando registro"
 
         val intent = Intent(this, SecurityMonitorService::class.java).apply {
             action = SecurityMonitorService.ACTION_PROCESS_CAPTURED_EVIDENCE
