@@ -58,10 +58,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        binding.btnEvidence.setOnClickListener {
-            startActivity(Intent(this, EvidenceActivity::class.java))
-        }
-
         binding.btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
@@ -120,11 +116,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshUiState() {
         val adminActive = devicePolicyManager.isAdminActive(adminComponent)
-        val shouldBeChecked = prefs.monitoringEnabled && adminActive
-        if (binding.switchMonitoring.isChecked != shouldBeChecked) {
-            binding.switchMonitoring.isChecked = shouldBeChecked
-        }
-        binding.tvStatus.text = if (shouldBeChecked)
+        binding.switchMonitoring.isChecked = prefs.monitoringEnabled && adminActive
+        binding.tvStatus.text = if (prefs.monitoringEnabled && adminActive)
             getString(com.autombot.security.R.string.status_protected)
         else
             getString(com.autombot.security.R.string.status_unprotected)
