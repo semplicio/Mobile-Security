@@ -26,6 +26,15 @@ class SecurityMonitorService : LifecycleService() {
     private lateinit var cameraHelper: CameraCaptureHelper
     private lateinit var locationHelper: LocationHelper
     private val emailExecutor = Executors.newSingleThreadExecutor()
+    private val handler = Handler(Looper.getMainLooper())
+
+    private val productionFallback = Runnable {
+        showStatusNotification(
+            "Evidência sem foto",
+            "O Android não liberou a câmera; localização e alerta serão enviados sem imagem."
+        )
+        sendEvidence(emptyList(), isTest = false)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -42,6 +51,7 @@ class SecurityMonitorService : LifecycleService() {
 
         when (intent?.action) {
             ACTION_INTRUSION_DETECTED -> handleIntrusionDetected()
+            ACTION_PROCESS_CAPTURED_EVIDENCE -> handleCapturedEvidence(intent)
             ACTION_TEST_ALERT -> handleTestAlert()
             ACTION_FIND_DEVICE -> alarmHelper.playAlarm()
             ACTION_STOP_ALARM -> alarmHelper.stopAlarm()
@@ -59,8 +69,30 @@ class SecurityMonitorService : LifecycleService() {
             showSecurityAlertNotification()
         }
 
-        captureAndSend(isTest = false)
-        Handler(Looper.getMainLooper()).postDelayed({ prefs.resetFailedAttempts() }, 5000)
+        // A captura de produção é feita pela IntrusionCaptureActivity, que fica
+        // visível sobre a tela bloqueada. Se o fabricante impedir a Activity de
+        // abrir a partir do background, mantemos o alerta funcional sem foto.
+        handler.removeCallbacks(productionFallback)
+        handler.postDelayed(productionFallback, PRODUCTION_CAPTURE_TIMEOUT_MS)
+        handler.postDelayed({ prefs.resetFailedAttempts() }, 5000)
+    }
+
+    private fun handleCapturedEvidence(intent: Intent) {
+        handler.removeCallbacks(productionFallback)
+
+        val photos = intent.getStringArrayListExtra(EXTRA_PHOTO_PATHS)
+            .orEmpty()
+            .map(::File)
+            .filter { it.exists() && it.isFile }
+
+        if (photos.isEmpty() && prefs.capturePhotosEnabled) {
+            showStatusNotification(
+                "Falha na captura",
+                "A câmera não pôde ser usada. O alerta seguirá sem foto."
+            )
+        }
+
+        sendEvidence(photos, isTest = false)
     }
 
     private fun handleTestAlert() {
@@ -68,25 +100,25 @@ class SecurityMonitorService : LifecycleService() {
             "Teste em andamento",
             "Validando câmera, localização e envio do alerta."
         )
-        captureAndSend(isTest = true)
+        captureAndSendTest()
     }
 
-    private fun captureAndSend(isTest: Boolean) {
+    private fun captureAndSendTest() {
         if (prefs.capturePhotosEnabled) {
             cameraHelper.capturePhotos(
                 lifecycleOwner = this,
                 count = prefs.photoCount,
-                onComplete = { photos -> sendEvidence(photos, isTest) },
+                onComplete = { photos -> sendEvidence(photos, isTest = true) },
                 onError = {
                     showStatusNotification(
                         "Falha na captura",
                         "A câmera não pôde ser usada. O alerta seguirá sem foto."
                     )
-                    sendEvidence(emptyList(), isTest)
+                    sendEvidence(emptyList(), isTest = true)
                 }
             )
         } else {
-            sendEvidence(emptyList(), isTest)
+            sendEvidence(emptyList(), isTest = true)
         }
     }
 
@@ -186,6 +218,7 @@ class SecurityMonitorService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(productionFallback)
         alarmHelper.stopAlarm()
         emailExecutor.shutdownNow()
         super.onDestroy()
@@ -193,13 +226,16 @@ class SecurityMonitorService : LifecycleService() {
 
     companion object {
         const val ACTION_INTRUSION_DETECTED = "com.autombot.security.action.INTRUSION_DETECTED"
+        const val ACTION_PROCESS_CAPTURED_EVIDENCE = "com.autombot.security.action.PROCESS_CAPTURED_EVIDENCE"
         const val ACTION_TEST_ALERT = "com.autombot.security.action.TEST_ALERT"
         const val ACTION_FIND_DEVICE = "com.autombot.security.action.FIND_DEVICE"
         const val ACTION_STOP_ALARM = "com.autombot.security.action.STOP_ALARM"
+        const val EXTRA_PHOTO_PATHS = "photo_paths"
 
         private const val CHANNEL_ID = "autombot_security_monitoring"
         private const val ALERT_CHANNEL_ID = "autombot_security_alerts"
         private const val NOTIFICATION_ID = 1001
         private const val SECURITY_ALERT_NOTIFICATION_ID = 1002
+        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 8000L
     }
 }
