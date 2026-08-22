@@ -18,7 +18,7 @@ import javax.mail.internet.MimeMultipart
 class EmailSender(private val prefs: PrefsManager) {
 
     fun sendIntrusionAlert(
-        photos: List<File>,
+        evidence: List<File>,
         mapsLink: String?,
         isTest: Boolean = false
     ): Boolean {
@@ -32,13 +32,15 @@ class EmailSender(private val prefs: PrefsManager) {
         }
 
         return try {
+            val validEvidence = evidence.filter { it.exists() && it.isFile }
+            val photos = validEvidence.count { it.extension.equals("jpg", true) || it.extension.equals("jpeg", true) }
+            val audios = validEvidence.count { it.extension.equals("m4a", true) }
+            val videos = validEvidence.count { it.extension.equals("mp4", true) }
+
             val session = buildSession()
             val message = MimeMessage(session).apply {
                 setFrom(InternetAddress(BuildConfig.SMTP_USER))
-                setRecipients(
-                    Message.RecipientType.TO,
-                    InternetAddress.parse(prefs.destinationEmail)
-                )
+                setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
                 subject = if (isTest) {
                     "AutomBot Security: teste de alerta"
                 } else {
@@ -47,17 +49,16 @@ class EmailSender(private val prefs: PrefsManager) {
             }
 
             val bodyText = buildString {
-                if (isTest) {
-                    append("Este é um teste do sistema de segurança do aparelho.\n\n")
-                } else {
-                    append("Foram detectadas tentativas incorretas de desbloqueio no seu aparelho.\n\n")
-                }
-                if (mapsLink != null) {
-                    append("Localização aproximada:\n$mapsLink\n\n")
-                } else {
-                    append("Não foi possível obter a localização no momento.\n\n")
-                }
-                append("Fotos anexadas: ${photos.count { it.exists() }}\n\n")
+                if (isTest) append("Este é um teste do sistema de segurança do aparelho.\n\n")
+                else append("Foram detectadas tentativas incorretas de desbloqueio no seu aparelho.\n\n")
+
+                if (mapsLink != null) append("Localização aproximada:\n$mapsLink\n\n")
+                else append("Não foi possível obter a localização no momento.\n\n")
+
+                append("Evidências anexadas:\n")
+                append("- Fotos: $photos\n")
+                append("- Áudios: $audios\n")
+                append("- Vídeos: $videos\n\n")
                 append("Mensagem automática do AutomBot Security.")
             }
 
@@ -65,11 +66,11 @@ class EmailSender(private val prefs: PrefsManager) {
                 addBodyPart(MimeBodyPart().apply { setText(bodyText, "utf-8") })
             }
 
-            photos.filter { it.exists() }.forEach { photo ->
+            validEvidence.forEach { file ->
                 multipart.addBodyPart(
                     MimeBodyPart().apply {
-                        dataHandler = DataHandler(FileDataSource(photo))
-                        fileName = photo.name
+                        dataHandler = DataHandler(FileDataSource(file))
+                        fileName = file.name
                     }
                 )
             }
