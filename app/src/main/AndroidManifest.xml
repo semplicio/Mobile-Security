@@ -41,6 +41,11 @@
             android:label="@string/settings_title" />
 
         <activity
+            android:name=".ui.ExperimentalFeaturesActivity"
+            android:exported="false"
+            android:label="Recursos experimentais" />
+
+        <activity
             android:name=".ui.IntrusionCaptureActivity"
             android:exported="false"
             android:excludeFromRecents="true"
