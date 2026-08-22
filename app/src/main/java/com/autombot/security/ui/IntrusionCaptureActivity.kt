@@ -7,20 +7,20 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.autombot.security.databinding.ActivityIntrusionCaptureBinding
 import com.autombot.security.service.SecurityMonitorService
+import com.autombot.security.util.AudioRecorderHelper
 import com.autombot.security.util.CameraCaptureHelper
 import com.autombot.security.util.PrefsManager
+import com.autombot.security.util.VideoCaptureHelper
 
-/**
- * Activity visível usada como ponte para acesso à câmera em Android moderno.
- * Ela aparece sobre a tela bloqueada, informa claramente que o aparelho está
- * protegido e captura evidências somente enquanto está visível.
- */
 class IntrusionCaptureActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityIntrusionCaptureBinding
     private lateinit var prefs: PrefsManager
     private lateinit var cameraHelper: CameraCaptureHelper
-    private var completed = false
+    private lateinit var audioHelper: AudioRecorderHelper
+    private lateinit var videoHelper: VideoCaptureHelper
+    private var started = false
+    private val evidencePaths = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,42 +42,86 @@ class IntrusionCaptureActivity : AppCompatActivity() {
 
         prefs = PrefsManager(this)
         cameraHelper = CameraCaptureHelper(this)
+        audioHelper = AudioRecorderHelper(this)
+        videoHelper = VideoCaptureHelper(this)
 
-        binding.tvDetail.text = if (prefs.capturePhotosEnabled) {
-            "Registrando evidência de segurança…"
-        } else {
-            "Registrando evento de segurança…"
-        }
+        binding.tvSecurityMessage.text = if (prefs.showAlertMessageEnabled) prefs.securityMessage else ""
+        binding.tvDetail.text = "Registrando evidências autorizadas de segurança…"
     }
 
     override fun onResume() {
         super.onResume()
-        if (completed) return
+        if (started) return
+        started = true
+        capturePhotosThenContinue()
+    }
 
+    private fun capturePhotosThenContinue() {
         if (!prefs.capturePhotosEnabled) {
-            completed = true
-            sendCapturedEvidence(emptyList())
+            recordAudioThenContinue()
             return
         }
 
+        binding.tvRecordingIndicator.text = "Capturando fotos…"
         cameraHelper.capturePhotos(
             lifecycleOwner = this,
             count = prefs.photoCount,
             onComplete = { files ->
-                completed = true
-                sendCapturedEvidence(files.map { it.absolutePath })
+                evidencePaths += files.map { it.absolutePath }
+                recordAudioThenContinue()
             },
             onError = {
-                completed = true
-                sendCapturedEvidence(emptyList())
+                recordAudioThenContinue()
             }
         )
     }
 
-    private fun sendCapturedEvidence(paths: List<String>) {
+    private fun recordAudioThenContinue() {
+        if (!prefs.recordAudioEnabled) {
+            recordVideoThenFinish()
+            return
+        }
+
+        binding.tvRecordingIndicator.text = "Microfone ativo • gravando áudio por 5 segundos"
+        audioHelper.recordFiveSeconds(
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                recordVideoThenFinish()
+            },
+            onError = {
+                recordVideoThenFinish()
+            }
+        )
+    }
+
+    private fun recordVideoThenFinish() {
+        if (!prefs.recordVideoEnabled) {
+            sendCapturedEvidence()
+            return
+        }
+
+        binding.tvRecordingIndicator.text = "Câmera ativa • gravando vídeo por 5 segundos"
+        videoHelper.recordFiveSeconds(
+            lifecycleOwner = this,
+            withAudio = false,
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                sendCapturedEvidence()
+            },
+            onError = {
+                sendCapturedEvidence()
+            }
+        )
+    }
+
+    private fun sendCapturedEvidence() {
+        binding.tvRecordingIndicator.text = "Evidência registrada"
         val intent = Intent(this, SecurityMonitorService::class.java).apply {
             action = SecurityMonitorService.ACTION_PROCESS_CAPTURED_EVIDENCE
-            putStringArrayListExtra(SecurityMonitorService.EXTRA_PHOTO_PATHS, ArrayList(paths))
+            putStringArrayListExtra(
+                SecurityMonitorService.EXTRA_EVIDENCE_PATHS,
+                ArrayList(evidencePaths)
+            )
         }
         startForegroundService(intent)
         finish()
