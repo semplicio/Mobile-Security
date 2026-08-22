@@ -30,8 +30,8 @@ class SecurityMonitorService : LifecycleService() {
 
     private val productionFallback = Runnable {
         showStatusNotification(
-            "Evidência sem foto",
-            "O Android não liberou a câmera; localização e alerta serão enviados sem imagem."
+            "Evidência parcial",
+            "O Android não concluiu a captura visual; localização e alerta serão enviados."
         )
         sendEvidence(emptyList(), isTest = false)
     }
@@ -61,17 +61,9 @@ class SecurityMonitorService : LifecycleService() {
     }
 
     private fun handleIntrusionDetected() {
-        if (prefs.alarmEnabled) {
-            alarmHelper.playAlarm()
-        }
+        if (prefs.alarmEnabled) alarmHelper.playAlarm()
+        if (prefs.showAlertMessageEnabled) showSecurityAlertNotification()
 
-        if (prefs.showAlertMessageEnabled) {
-            showSecurityAlertNotification()
-        }
-
-        // A captura de produção é feita pela IntrusionCaptureActivity, que fica
-        // visível sobre a tela bloqueada. Se o fabricante impedir a Activity de
-        // abrir a partir do background, mantemos o alerta funcional sem foto.
         handler.removeCallbacks(productionFallback)
         handler.postDelayed(productionFallback, PRODUCTION_CAPTURE_TIMEOUT_MS)
         handler.postDelayed({ prefs.resetFailedAttempts() }, 5000)
@@ -80,19 +72,19 @@ class SecurityMonitorService : LifecycleService() {
     private fun handleCapturedEvidence(intent: Intent) {
         handler.removeCallbacks(productionFallback)
 
-        val photos = intent.getStringArrayListExtra(EXTRA_PHOTO_PATHS)
+        val evidence = intent.getStringArrayListExtra(EXTRA_EVIDENCE_PATHS)
             .orEmpty()
             .map(::File)
             .filter { it.exists() && it.isFile }
 
-        if (photos.isEmpty() && prefs.capturePhotosEnabled) {
+        if (evidence.isEmpty()) {
             showStatusNotification(
-                "Falha na captura",
-                "A câmera não pôde ser usada. O alerta seguirá sem foto."
+                "Evidência sem mídia",
+                "O alerta seguirá com localização, mas sem foto, áudio ou vídeo."
             )
         }
 
-        sendEvidence(photos, isTest = false)
+        sendEvidence(evidence, isTest = false)
     }
 
     private fun handleTestAlert() {
@@ -122,7 +114,7 @@ class SecurityMonitorService : LifecycleService() {
         }
     }
 
-    private fun sendEvidence(photos: List<File>, isTest: Boolean) {
+    private fun sendEvidence(evidence: List<File>, isTest: Boolean) {
         locationHelper.getCurrentLocation { location ->
             val mapsLink = location?.let { locationHelper.mapsLink(it) }
 
@@ -138,7 +130,7 @@ class SecurityMonitorService : LifecycleService() {
 
             emailExecutor.execute {
                 val success = EmailSender(prefs).sendIntrusionAlert(
-                    photos = photos,
+                    evidence = evidence,
                     mapsLink = mapsLink,
                     isTest = isTest
                 )
@@ -147,7 +139,7 @@ class SecurityMonitorService : LifecycleService() {
                     showStatusNotification(
                         if (success) "Teste concluído" else "Falha no envio do teste",
                         if (success) {
-                            "Alerta enviado. Fotos capturadas: ${photos.size}."
+                            "Alerta enviado. Arquivos anexados: ${evidence.size}."
                         } else {
                             "Confira a configuração administrativa do build e a conexão de rede."
                         }
@@ -158,10 +150,7 @@ class SecurityMonitorService : LifecycleService() {
     }
 
     private fun showSecurityAlertNotification() {
-        showStatusNotification(
-            "Aparelho protegido",
-            "Foram detectadas tentativas de acesso não autorizado."
-        )
+        showStatusNotification("Aparelho protegido", prefs.securityMessage)
     }
 
     private fun showStatusNotification(title: String, text: String) {
@@ -181,10 +170,7 @@ class SecurityMonitorService : LifecycleService() {
 
     private fun buildMonitoringNotification(): android.app.Notification {
         val openAppIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -208,11 +194,7 @@ class SecurityMonitorService : LifecycleService() {
                 )
             )
             manager.createNotificationChannel(
-                NotificationChannel(
-                    ALERT_CHANNEL_ID,
-                    "Alertas de segurança",
-                    NotificationManager.IMPORTANCE_HIGH
-                )
+                NotificationChannel(ALERT_CHANNEL_ID, "Alertas de segurança", NotificationManager.IMPORTANCE_HIGH)
             )
         }
     }
@@ -230,12 +212,12 @@ class SecurityMonitorService : LifecycleService() {
         const val ACTION_TEST_ALERT = "com.autombot.security.action.TEST_ALERT"
         const val ACTION_FIND_DEVICE = "com.autombot.security.action.FIND_DEVICE"
         const val ACTION_STOP_ALARM = "com.autombot.security.action.STOP_ALARM"
-        const val EXTRA_PHOTO_PATHS = "photo_paths"
+        const val EXTRA_EVIDENCE_PATHS = "evidence_paths"
 
         private const val CHANNEL_ID = "autombot_security_monitoring"
         private const val ALERT_CHANNEL_ID = "autombot_security_alerts"
         private const val NOTIFICATION_ID = 1001
         private const val SECURITY_ALERT_NOTIFICATION_ID = 1002
-        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 8000L
+        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 22000L
     }
 }
