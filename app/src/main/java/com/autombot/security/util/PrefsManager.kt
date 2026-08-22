@@ -63,6 +63,18 @@ class PrefsManager(context: Context) {
         get() = prefs.getBoolean(KEY_APP_LOCK, false)
         set(value) = prefs.edit().putBoolean(KEY_APP_LOCK, value).apply()
 
+    var experimentalPowerMenuProtection: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_POWER_MENU, false)
+        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_POWER_MENU, value).apply()
+
+    var experimentalStatusBarProtection: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_STATUS_BAR, false)
+        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_STATUS_BAR, value).apply()
+
+    var experimentalCaptureOnSystemUi: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI, false)
+        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI, value).apply()
+
     fun incrementFailedAttempts(): Int {
         val next = currentFailedAttempts + 1
         currentFailedAttempts = next
@@ -92,6 +104,9 @@ class PrefsManager(context: Context) {
         private const val KEY_OWNER_NOTIFICATION = "owner_notification_enabled"
         private const val KEY_SHOW_MESSAGE = "show_alert_message_enabled"
         private const val KEY_APP_LOCK = "app_lock_enabled"
+        private const val KEY_EXPERIMENTAL_POWER_MENU = "experimental_power_menu_protection"
+        private const val KEY_EXPERIMENTAL_STATUS_BAR = "experimental_status_bar_protection"
+        private const val KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI = "experimental_capture_system_ui"
 
         const val DEFAULT_THRESHOLD = 2
     }
