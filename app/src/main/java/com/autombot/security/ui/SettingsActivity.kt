@@ -7,6 +7,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.autombot.security.BuildConfig
 import com.autombot.security.databinding.ActivitySettingsBinding
 import com.autombot.security.service.SecurityMonitorService
 import com.autombot.security.util.GmailApiSender
@@ -37,7 +38,7 @@ class SettingsActivity : AppCompatActivity() {
         }.onFailure { error ->
             Toast.makeText(
                 this,
-                "Falha na autorização Google: ${error.message ?: "erro desconhecido"}",
+                googleAuthorizationErrorMessage(error),
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -124,7 +125,7 @@ class SettingsActivity : AppCompatActivity() {
             .addOnFailureListener { error ->
                 Toast.makeText(
                     this,
-                    "Falha ao iniciar autorização Google: ${error.message ?: "erro desconhecido"}",
+                    googleAuthorizationErrorMessage(error),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -151,6 +152,18 @@ class SettingsActivity : AppCompatActivity() {
             "Conta Google conectada. O app recebeu somente permissão de envio.",
             Toast.LENGTH_LONG
         ).show()
+    }
+
+    private fun googleAuthorizationErrorMessage(error: Throwable): String {
+        val detail = error.message.orEmpty()
+        return if (
+            detail.contains("UNREGISTERED_ON_API_CONSOLE", ignoreCase = true) ||
+            detail.contains("status=UNREGISTERED", ignoreCase = true)
+        ) {
+            "OAuth Android não registrado para este APK. No Google Cloud, confira o cliente Android do pacote ${BuildConfig.APPLICATION_ID} e o SHA-1 da assinatura usada neste APK."
+        } else {
+            "Falha na autorização Google: ${detail.ifBlank { "erro desconhecido" }}"
+        }
     }
 
     private fun loadCurrentValues() = with(binding) {
