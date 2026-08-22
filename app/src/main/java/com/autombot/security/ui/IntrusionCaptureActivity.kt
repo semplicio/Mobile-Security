@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.autombot.security.databinding.ActivityIntrusionCaptureBinding
 import com.autombot.security.service.SecurityMonitorService
 import com.autombot.security.util.AudioRecorderHelper
@@ -45,9 +46,13 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         audioHelper = AudioRecorderHelper(this)
         videoHelper = VideoCaptureHelper(this)
 
-        binding.tvSecurityMessage.text = if (prefs.showAlertMessageEnabled) prefs.securityMessage else ""
-        binding.tvDetail.text = "Proteção ativa"
-        binding.tvRecordingIndicator.text = "Processando…"
+        binding.tvSecurityMessage.text = if (prefs.showAlertMessageEnabled) {
+            prefs.securityMessage
+        } else {
+            "Incidente de segurança detectado."
+        }
+        binding.tvDetail.text = "Registrando as evidências habilitadas pelo proprietário."
+        binding.tvRecordingIndicator.text = "Preparando registro…"
     }
 
     override fun onResume() {
@@ -63,7 +68,9 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Processando…"
+        binding.tvRecordingIndicator.text =
+            "Câmera ativa • capturando ${prefs.photoCount} foto(s)"
+
         cameraHelper.capturePhotos(
             lifecycleOwner = this,
             count = prefs.photoCount,
@@ -72,6 +79,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
                 recordAudioThenContinue()
             },
             onError = {
+                binding.tvRecordingIndicator.text = "Não foi possível concluir as fotos"
                 recordAudioThenContinue()
             }
         )
@@ -83,13 +91,15 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Processando…"
+        binding.tvRecordingIndicator.text = "Microfone ativo • gravando áudio por 5 segundos"
+
         audioHelper.recordFiveSeconds(
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
                 recordVideoThenFinish()
             },
             onError = {
+                binding.tvRecordingIndicator.text = "Não foi possível concluir o áudio"
                 recordVideoThenFinish()
             }
         )
@@ -101,7 +111,8 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Processando…"
+        binding.tvRecordingIndicator.text = "Câmera ativa • gravando vídeo por 5 segundos"
+
         videoHelper.recordFiveSeconds(
             lifecycleOwner = this,
             withAudio = false,
@@ -110,13 +121,15 @@ class IntrusionCaptureActivity : AppCompatActivity() {
                 sendCapturedEvidence()
             },
             onError = {
+                binding.tvRecordingIndicator.text = "Não foi possível concluir o vídeo"
                 sendCapturedEvidence()
             }
         )
     }
 
     private fun sendCapturedEvidence() {
-        binding.tvRecordingIndicator.text = "Concluído"
+        binding.tvRecordingIndicator.text = "Registro concluído • enviando alerta"
+
         val intent = Intent(this, SecurityMonitorService::class.java).apply {
             action = SecurityMonitorService.ACTION_PROCESS_CAPTURED_EVIDENCE
             putStringArrayListExtra(
@@ -124,7 +137,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
                 ArrayList(evidencePaths)
             )
         }
-        startForegroundService(intent)
+        ContextCompat.startForegroundService(this, intent)
         finish()
     }
 }
