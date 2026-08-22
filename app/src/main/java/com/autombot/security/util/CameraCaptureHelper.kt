@@ -19,6 +19,7 @@ class CameraCaptureHelper(private val context: Context) {
     fun capturePhotos(
         lifecycleOwner: LifecycleOwner,
         count: Int,
+        lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
         onComplete: (List<File>) -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -30,8 +31,10 @@ class CameraCaptureHelper(private val context: Context) {
                 onComplete(captured)
                 return
             }
+
             capturePhoto(
                 lifecycleOwner = lifecycleOwner,
+                lensFacing = lensFacing,
                 onSuccess = {
                     captured += it
                     captureNext()
@@ -47,6 +50,7 @@ class CameraCaptureHelper(private val context: Context) {
 
     fun capturePhoto(
         lifecycleOwner: LifecycleOwner,
+        lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
         onSuccess: (File) -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -59,15 +63,28 @@ class CameraCaptureHelper(private val context: Context) {
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
 
+                val selector = CameraSelector.Builder()
+                    .requireLensFacing(lensFacing)
+                    .build()
+
+                if (!cameraProvider.hasCamera(selector)) {
+                    onError(IllegalStateException("Câmera solicitada não está disponível"))
+                    return@addListener
+                }
+
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    selector,
                     imageCapture
                 )
 
                 val outputDir = File(context.filesDir, "intrusion_photos").apply { mkdirs() }
-                val photoFile = File(outputDir, "intruso_${timestamp()}_${System.nanoTime()}.jpg")
+                val side = if (lensFacing == CameraSelector.LENS_FACING_BACK) "traseira" else "frontal"
+                val photoFile = File(
+                    outputDir,
+                    "intruso_${side}_${timestamp()}_${System.nanoTime()}.jpg"
+                )
                 val outputOptions = OutputFileOptions.Builder(photoFile).build()
 
                 imageCapture.takePicture(
