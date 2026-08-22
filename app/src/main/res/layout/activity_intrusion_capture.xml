@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="center"
-            android:text="Aparelho protegido"
+            android:text="Incidente de segurança"
             android:textColor="#FFFFFF"
             android:textSize="30sp"
             android:textStyle="bold" />
@@ -53,7 +53,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
             android:gravity="center"
-            android:text="Proteção ativa"
+            android:text="Registrando as evidências habilitadas pelo proprietário."
             android:textColor="#B7C8DB"
             android:textSize="15sp" />
 
@@ -61,9 +61,9 @@
             android:id="@+id/tvRecordingIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:gravity="center"
-            android:text=""
+            android:text="Preparando registro…"
             android:textColor="#62F5B7"
             android:textSize="13sp"
             android:textStyle="bold" />
