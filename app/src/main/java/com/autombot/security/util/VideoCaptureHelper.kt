@@ -26,6 +26,7 @@ class VideoCaptureHelper(private val context: Context) {
     fun recordFiveSeconds(
         lifecycleOwner: LifecycleOwner,
         withAudio: Boolean,
+        lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
         onSuccess: (File) -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -33,6 +34,15 @@ class VideoCaptureHelper(private val context: Context) {
         cameraProviderFuture.addListener({
             try {
                 val provider = cameraProviderFuture.get()
+                val selector = CameraSelector.Builder()
+                    .requireLensFacing(lensFacing)
+                    .build()
+
+                if (!provider.hasCamera(selector)) {
+                    onError(IllegalStateException("Câmera solicitada não está disponível"))
+                    return@addListener
+                }
+
                 val recorder = Recorder.Builder()
                     .setQualitySelector(QualitySelector.from(Quality.SD))
                     .build()
@@ -41,16 +51,20 @@ class VideoCaptureHelper(private val context: Context) {
                 provider.unbindAll()
                 provider.bindToLifecycle(
                     lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    selector,
                     videoCapture
                 )
 
                 val outputDir = File(context.filesDir, "intrusion_video").apply { mkdirs() }
-                val file = File(outputDir, "video_${timestamp()}.mp4")
+                val side = if (lensFacing == CameraSelector.LENS_FACING_BACK) "traseira" else "frontal"
+                val file = File(outputDir, "video_${side}_${timestamp()}.mp4")
                 val output = FileOutputOptions.Builder(file).build()
                 var pending = videoCapture.output.prepareRecording(context, output)
 
-                if (withAudio && ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                if (
+                    withAudio &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                ) {
                     pending = pending.withAudioEnabled()
                 }
 
@@ -61,7 +75,11 @@ class VideoCaptureHelper(private val context: Context) {
                         if (!event.hasError() && file.exists() && file.length() > 0L) {
                             onSuccess(file)
                         } else {
-                            onError(IllegalStateException("Falha ao finalizar gravação de vídeo: ${event.error}"))
+                            onError(
+                                IllegalStateException(
+                                    "Falha ao finalizar gravação de vídeo: ${event.error}"
+                                )
+                            )
                         }
                     }
                 }
