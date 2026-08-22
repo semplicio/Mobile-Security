@@ -39,12 +39,7 @@ class GmailApiSender(
         }
 
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(
-                listOf(
-                    Scope(GMAIL_SEND_SCOPE),
-                    Scope(EMAIL_SCOPE)
-                )
-            )
+            .setRequestedScopes(requiredScopes())
             .build()
 
         Identity.getAuthorizationClient(context)
@@ -61,27 +56,80 @@ class GmailApiSender(
                     return@addOnSuccessListener
                 }
 
-                result.toGoogleSignInAccount()?.email?.let { email ->
-                    prefs.googleAccountEmail = email
-                }
+                prefs.googleAccountConnected = true
 
                 EXECUTOR.execute {
-                    val sent = runCatching {
-                        sendWithAccessToken(token, evidence, mapsLink, isTest)
+                    val senderEmail = resolveSenderEmail(token)
+                        ?: prefs.googleAccountEmail.takeIf(::isValidEmail)
+
+                    if (senderEmail == null) {
+                        onResult(
+                            false,
+                            "Conta Google autorizada, mas não foi possível identificar o e-mail da conta. Reconecte a conta Google."
+                        )
+                        return@execute
+                    }
+
+                    prefs.googleAccountEmail = senderEmail
+
+                    val sendResult = runCatching {
+                        sendWithAccessToken(
+                            accessToken = token,
+                            senderEmail = senderEmail,
+                            evidence = evidence,
+                            mapsLink = mapsLink,
+                            isTest = isTest
+                        )
                     }.onFailure {
                         Log.e(TAG, "Falha ao enviar pela Gmail API", it)
-                    }.getOrDefault(false)
+                    }.getOrElse { error ->
+                        ApiSendResult(
+                            success = false,
+                            detail = error.message ?: "Falha inesperada ao enviar pela Gmail API"
+                        )
+                    }
 
-                    onResult(
-                        sent,
-                        if (sent) "Alerta enviado pela Gmail API" else "Falha ao enviar pela Gmail API"
-                    )
+                    onResult(sendResult.success, sendResult.detail)
                 }
             }
             .addOnFailureListener { error ->
                 Log.e(TAG, "Falha ao obter autorização Google", error)
                 onResult(false, googleAuthorizationErrorMessage(error))
             }
+    }
+
+    private fun resolveSenderEmail(accessToken: String): String? {
+        val connection = (URL(USER_INFO_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 12_000
+            readTimeout = 15_000
+            setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Accept", "application/json")
+        }
+
+        return try {
+            val code = connection.responseCode
+            val body = if (code in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            }
+
+            if (code !in 200..299) {
+                Log.e(TAG, "Google UserInfo HTTP $code: $body")
+                null
+            } else {
+                JSONObject(body)
+                    .optString("email")
+                    .trim()
+                    .takeIf(::isValidEmail)
+            }
+        } catch (error: Exception) {
+            Log.e(TAG, "Falha ao identificar a conta Google", error)
+            null
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun googleAuthorizationErrorMessage(error: Throwable): String {
@@ -98,11 +146,12 @@ class GmailApiSender(
 
     private fun sendWithAccessToken(
         accessToken: String,
+        senderEmail: String,
         evidence: List<File>,
         mapsLink: String?,
         isTest: Boolean
-    ): Boolean {
-        val rawMessage = buildMimeMessage(evidence, mapsLink, isTest)
+    ): ApiSendResult {
+        val rawMessage = buildMimeMessage(senderEmail, evidence, mapsLink, isTest)
         val encoded = Base64.encodeToString(
             rawMessage,
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
@@ -115,23 +164,55 @@ class GmailApiSender(
             doOutput = true
             setRequestProperty("Authorization", "Bearer $accessToken")
             setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            setRequestProperty("Accept", "application/json")
         }
 
-        val payload = JSONObject().put("raw", encoded).toString().toByteArray(Charsets.UTF_8)
-        connection.outputStream.use { it.write(payload) }
+        return try {
+            val payload = JSONObject()
+                .put("raw", encoded)
+                .toString()
+                .toByteArray(Charsets.UTF_8)
 
-        val code = connection.responseCode
-        if (code !in 200..299) {
-            val errorText = runCatching {
-                connection.errorStream?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()
-            Log.e(TAG, "Gmail API HTTP $code: $errorText")
+            connection.outputStream.use { it.write(payload) }
+
+            val code = connection.responseCode
+            val responseText = if (code in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            }
+
+            if (code in 200..299) {
+                Log.i(TAG, "Gmail API HTTP $code: mensagem enviada")
+                ApiSendResult(true, "Alerta enviado pela Gmail API")
+            } else {
+                val detail = parseGmailApiError(code, responseText)
+                Log.e(TAG, "Gmail API HTTP $code: $responseText")
+                ApiSendResult(false, detail)
+            }
+        } finally {
+            connection.disconnect()
         }
-        connection.disconnect()
-        return code in 200..299
+    }
+
+    private fun parseGmailApiError(code: Int, responseText: String): String {
+        val apiMessage = runCatching {
+            JSONObject(responseText)
+                .optJSONObject("error")
+                ?.optString("message")
+                ?.trim()
+                .orEmpty()
+        }.getOrDefault("")
+
+        return when {
+            apiMessage.isNotBlank() -> "Gmail API HTTP $code: $apiMessage"
+            responseText.isNotBlank() -> "Gmail API HTTP $code: ${responseText.take(220)}"
+            else -> "Gmail API HTTP $code: falha no envio"
+        }
     }
 
     private fun buildMimeMessage(
+        senderEmail: String,
         evidence: List<File>,
         mapsLink: String?,
         isTest: Boolean
@@ -143,9 +224,7 @@ class GmailApiSender(
 
         val session = Session.getInstance(Properties())
         val message = MimeMessage(session).apply {
-            prefs.googleAccountEmail.takeIf { it.isNotBlank() }?.let {
-                setFrom(InternetAddress(it))
-            }
+            setFrom(InternetAddress(senderEmail))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
             subject = if (isTest) {
                 "AutomBot Security: teste de alerta"
@@ -192,9 +271,28 @@ class GmailApiSender(
 
     companion object {
         const val GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+        const val OPENID_SCOPE = "openid"
+        const val PROFILE_SCOPE = "profile"
         const val EMAIL_SCOPE = "email"
+
         private const val GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        private const val USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
         private const val TAG = "GmailApiSender"
         private val EXECUTOR = Executors.newSingleThreadExecutor()
+
+        fun requiredScopes(): List<Scope> = listOf(
+            Scope(GMAIL_SEND_SCOPE),
+            Scope(OPENID_SCOPE),
+            Scope(PROFILE_SCOPE),
+            Scope(EMAIL_SCOPE)
+        )
+
+        private fun isValidEmail(value: String): Boolean =
+            value.contains("@") && value.substringAfter("@").contains(".")
     }
+
+    private data class ApiSendResult(
+        val success: Boolean,
+        val detail: String
+    )
 }
