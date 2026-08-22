@@ -15,7 +15,6 @@ import com.autombot.security.util.PrefsManager
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
-import com.google.android.gms.common.api.Scope
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -96,14 +95,16 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::prefs.isInitialized) {
+            refreshGoogleAccountStatus()
+        }
+    }
+
     private fun connectGoogleAccount() {
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(
-                listOf(
-                    Scope(GmailApiSender.GMAIL_SEND_SCOPE),
-                    Scope(GmailApiSender.EMAIL_SCOPE)
-                )
-            )
+            .setRequestedScopes(GmailApiSender.requiredScopes())
             .build()
 
         Identity.getAuthorizationClient(this)
@@ -132,24 +133,30 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun completeGoogleAuthorization(result: AuthorizationResult) {
-        val hasSendScope = result.grantedScopes.contains(GmailApiSender.GMAIL_SEND_SCOPE)
-        if (!hasSendScope || result.accessToken.isNullOrBlank()) {
+        val grantedScopes = result.grantedScopes
+        val hasSendScope = grantedScopes.contains(GmailApiSender.GMAIL_SEND_SCOPE)
+        val hasOpenId = grantedScopes.contains(GmailApiSender.OPENID_SCOPE)
+        val hasEmail = grantedScopes.contains(GmailApiSender.EMAIL_SCOPE)
+
+        if (!hasSendScope || !hasOpenId || !hasEmail || result.accessToken.isNullOrBlank()) {
+            prefs.googleAccountConnected = false
             Toast.makeText(
                 this,
-                "A permissão de envio do Gmail não foi concedida.",
+                "As permissões necessárias do Google não foram concedidas.",
                 Toast.LENGTH_LONG
             ).show()
+            refreshGoogleAccountStatus()
             return
         }
 
-        val email = result.toGoogleSignInAccount()?.email.orEmpty()
-        prefs.googleAccountEmail = email.ifBlank { "Conta Google autorizada" }
+        prefs.googleAccountEmail = ""
+        prefs.googleAccountConnected = true
         prefs.alertTransport = PrefsManager.TRANSPORT_GMAIL
         refreshGoogleAccountStatus()
 
         Toast.makeText(
             this,
-            "Conta Google conectada. O app recebeu somente permissão de envio.",
+            "Conta Google autorizada. O e-mail será confirmado no primeiro envio.",
             Toast.LENGTH_LONG
         ).show()
     }
@@ -184,13 +191,14 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun refreshGoogleAccountStatus() = with(binding) {
-        tvGoogleAccountStatus.text = if (prefs.isGmailConfigured()) {
-            "Conta conectada: ${prefs.googleAccountEmail}"
-        } else {
-            "Conta Google não conectada"
+        val connected = prefs.isGmailConfigured()
+        tvGoogleAccountStatus.text = when {
+            !connected -> "Conta Google não conectada"
+            prefs.googleAccountEmail.contains("@") -> "Conta conectada: ${prefs.googleAccountEmail}"
+            else -> "Conta Google autorizada"
         }
-        btnConnectGoogle.text = if (prefs.isGmailConfigured()) {
-            "Trocar conta Google"
+        btnConnectGoogle.text = if (connected) {
+            "Reconectar conta Google"
         } else {
             "Conectar conta Google"
         }
