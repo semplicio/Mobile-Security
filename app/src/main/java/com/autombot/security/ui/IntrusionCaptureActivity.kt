@@ -46,7 +46,8 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         videoHelper = VideoCaptureHelper(this)
 
         binding.tvSecurityMessage.text = if (prefs.showAlertMessageEnabled) prefs.securityMessage else ""
-        binding.tvDetail.text = "Registrando evidências autorizadas de segurança…"
+        binding.tvDetail.text = "Proteção ativa"
+        binding.tvRecordingIndicator.text = "Processando…"
     }
 
     override fun onResume() {
@@ -62,7 +63,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Capturando fotos…"
+        binding.tvRecordingIndicator.text = "Processando…"
         cameraHelper.capturePhotos(
             lifecycleOwner = this,
             count = prefs.photoCount,
@@ -82,7 +83,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Microfone ativo • gravando áudio por 5 segundos"
+        binding.tvRecordingIndicator.text = "Processando…"
         audioHelper.recordFiveSeconds(
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
@@ -100,7 +101,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             return
         }
 
-        binding.tvRecordingIndicator.text = "Câmera ativa • gravando vídeo por 5 segundos"
+        binding.tvRecordingIndicator.text = "Processando…"
         videoHelper.recordFiveSeconds(
             lifecycleOwner = this,
             withAudio = false,
@@ -115,7 +116,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     }
 
     private fun sendCapturedEvidence() {
-        binding.tvRecordingIndicator.text = "Evidência registrada"
+        binding.tvRecordingIndicator.text = "Concluído"
         val intent = Intent(this, SecurityMonitorService::class.java).apply {
             action = SecurityMonitorService.ACTION_PROCESS_CAPTURED_EVIDENCE
             putStringArrayListExtra(
