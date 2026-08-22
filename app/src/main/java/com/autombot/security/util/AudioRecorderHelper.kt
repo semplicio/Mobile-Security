@@ -29,7 +29,7 @@ class AudioRecorderHelper(private val context: Context) {
         var recorder: MediaRecorder? = null
 
         try {
-            recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+            recorder = createRecorder()
             recorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -57,6 +57,10 @@ class AudioRecorderHelper(private val context: Context) {
             onError(t)
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun createRecorder(): MediaRecorder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
 
     private fun timestamp(): String =
         SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
