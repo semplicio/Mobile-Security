@@ -32,6 +32,14 @@ class SecurityMonitorService : LifecycleService() {
     private val emailExecutor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
 
+    private val productionFallback = Runnable {
+        showStatusNotification(
+            "Evidência parcial",
+            "A captura de mídia não foi concluída a tempo. O alerta seguirá com localização e dados do incidente."
+        )
+        sendEvidence(emptyList(), isTest = false)
+    }
+
     override fun onCreate() {
         super.onCreate()
         prefs = PrefsManager(this)
@@ -60,22 +68,26 @@ class SecurityMonitorService : LifecycleService() {
         if (prefs.alarmEnabled) alarmHelper.playAlarm()
         if (prefs.showAlertMessageEnabled) showSecurityAlertNotification()
 
-        // O alerta real registra somente dados técnicos e de contexto que podem
-        // ser coletados sem iniciar câmera ou microfone em segundo plano.
-        sendEvidence(emptyList(), isTest = false)
-        handler.postDelayed({ prefs.resetFailedAttempts() }, 5000)
+        // Não envia o e-mail imediatamente. Primeiro dá tempo para a Activity
+        // visível registrar as mídias habilitadas pelo proprietário. Se o Android
+        // impedir a abertura da tela ou a captura falhar, o fallback envia o
+        // alerta somente com localização e dados técnicos.
+        handler.removeCallbacks(productionFallback)
+        handler.postDelayed(productionFallback, PRODUCTION_CAPTURE_TIMEOUT_MS)
     }
 
     private fun handleCapturedEvidence(intent: Intent) {
+        handler.removeCallbacks(productionFallback)
+
         val evidence = intent.getStringArrayListExtra(EXTRA_EVIDENCE_PATHS)
             .orEmpty()
             .map(::File)
-            .filter { it.exists() && it.isFile }
+            .filter { it.exists() && it.isFile && it.length() > 0L }
 
         if (evidence.isEmpty()) {
             showStatusNotification(
                 "Evidência sem mídia",
-                "O alerta seguirá com os dados disponíveis, sem arquivo de mídia."
+                "A tela de registro foi concluída, mas nenhum arquivo de mídia válido foi gerado."
             )
         }
 
@@ -141,6 +153,11 @@ class SecurityMonitorService : LifecycleService() {
                                 "Teste concluído",
                                 "Alerta enviado pela Gmail API. Arquivos anexados: ${evidence.size}."
                             )
+                        } else {
+                            showStatusNotification(
+                                "Alerta enviado",
+                                "Evento enviado ao proprietário. Arquivos anexados: ${evidence.size}."
+                            )
                         }
                     } else {
                         trySmtpFallback(evidence, mapsLink, incident, isTest, detail)
@@ -182,7 +199,12 @@ class SecurityMonitorService : LifecycleService() {
                         "$gmailFailureDetail. Abra Configurações e conecte novamente a conta Google."
                     }
                 )
-            } else if (!smtpSuccess) {
+            } else if (smtpSuccess) {
+                showStatusNotification(
+                    "Alerta enviado via fallback",
+                    "Evento enviado ao proprietário. Arquivos anexados: ${evidence.size}."
+                )
+            } else {
                 showStatusNotification(
                     "Alerta não enviado",
                     "$gmailFailureDetail. Reconecte a conta Google assim que possível."
@@ -242,6 +264,7 @@ class SecurityMonitorService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(productionFallback)
         handler.removeCallbacksAndMessages(null)
         alarmHelper.stopAlarm()
         emailExecutor.shutdownNow()
@@ -260,5 +283,6 @@ class SecurityMonitorService : LifecycleService() {
         private const val ALERT_CHANNEL_ID = "autombot_security_alerts"
         private const val NOTIFICATION_ID = 1001
         private const val SECURITY_ALERT_NOTIFICATION_ID = 1002
+        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 45_000L
     }
 }
