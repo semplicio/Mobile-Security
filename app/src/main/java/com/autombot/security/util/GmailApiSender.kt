@@ -22,10 +22,6 @@ import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 
-/**
- * Envia alertas diretamente do aparelho pela Gmail API usando Google OAuth 2.0.
- * O único escopo solicitado é gmail.send: o app não lê nem gerencia a caixa postal.
- */
 class GmailApiSender(
     private val context: Context,
     private val prefs: PrefsManager
@@ -43,7 +39,12 @@ class GmailApiSender(
         }
 
         val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(Scope(GMAIL_SEND_SCOPE)))
+            .setRequestedScopes(
+                listOf(
+                    Scope(GMAIL_SEND_SCOPE),
+                    Scope(EMAIL_SCOPE)
+                )
+            )
             .build()
 
         Identity.getAuthorizationClient(context)
@@ -130,8 +131,9 @@ class GmailApiSender(
 
         val session = Session.getInstance(Properties())
         val message = MimeMessage(session).apply {
-            val fromAddress = prefs.googleAccountEmail.ifBlank { prefs.destinationEmail }
-            setFrom(InternetAddress(fromAddress))
+            prefs.googleAccountEmail.takeIf { it.isNotBlank() }?.let {
+                setFrom(InternetAddress(it))
+            }
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
             subject = if (isTest) {
                 "AutomBot Security: teste de alerta"
@@ -178,6 +180,7 @@ class GmailApiSender(
 
     companion object {
         const val GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+        const val EMAIL_SCOPE = "email"
         private const val GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
         private const val TAG = "GmailApiSender"
         private val EXECUTOR = Executors.newSingleThreadExecutor()
