@@ -42,6 +42,7 @@ class SecurityMonitorService : LifecycleService() {
 
         when (intent?.action) {
             ACTION_INTRUSION_DETECTED -> handleIntrusionDetected()
+            ACTION_TEST_ALERT -> handleTestAlert()
             ACTION_FIND_DEVICE -> alarmHelper.playAlarm()
             ACTION_STOP_ALARM -> alarmHelper.stopAlarm()
         }
@@ -58,39 +59,88 @@ class SecurityMonitorService : LifecycleService() {
             showSecurityAlertNotification()
         }
 
+        captureAndSend(isTest = false)
+        Handler(Looper.getMainLooper()).postDelayed({ prefs.resetFailedAttempts() }, 5000)
+    }
+
+    private fun handleTestAlert() {
+        showStatusNotification(
+            "Teste em andamento",
+            "Validando câmera, localização e envio do alerta."
+        )
+        captureAndSend(isTest = true)
+    }
+
+    private fun captureAndSend(isTest: Boolean) {
         if (prefs.capturePhotosEnabled) {
             cameraHelper.capturePhotos(
                 lifecycleOwner = this,
                 count = prefs.photoCount,
-                onComplete = { photos -> sendEvidence(photos) },
-                onError = { sendEvidence(emptyList()) }
+                onComplete = { photos -> sendEvidence(photos, isTest) },
+                onError = {
+                    showStatusNotification(
+                        "Falha na captura",
+                        "A câmera não pôde ser usada. O alerta seguirá sem foto."
+                    )
+                    sendEvidence(emptyList(), isTest)
+                }
             )
         } else {
-            sendEvidence(emptyList())
+            sendEvidence(emptyList(), isTest)
         }
-
-        Handler(Looper.getMainLooper()).postDelayed({ prefs.resetFailedAttempts() }, 5000)
     }
 
-    private fun sendEvidence(photos: List<File>) {
+    private fun sendEvidence(photos: List<File>, isTest: Boolean) {
         locationHelper.getCurrentLocation { location ->
             val mapsLink = location?.let { locationHelper.mapsLink(it) }
-            if (prefs.ownerNotificationEnabled) {
-                emailExecutor.execute {
-                    EmailSender(prefs).sendIntrusionAlert(photos, mapsLink)
+
+            if (!prefs.ownerNotificationEnabled) {
+                if (isTest) {
+                    showStatusNotification(
+                        "Teste concluído sem envio",
+                        "O alerta ao proprietário está desativado nas configurações."
+                    )
+                }
+                return@getCurrentLocation
+            }
+
+            emailExecutor.execute {
+                val success = EmailSender(prefs).sendIntrusionAlert(
+                    photos = photos,
+                    mapsLink = mapsLink,
+                    isTest = isTest
+                )
+
+                if (isTest) {
+                    showStatusNotification(
+                        if (success) "Teste concluído" else "Falha no envio do teste",
+                        if (success) {
+                            "Alerta enviado. Fotos capturadas: ${photos.size}."
+                        } else {
+                            "Confira a configuração administrativa do build e a conexão de rede."
+                        }
+                    )
                 }
             }
         }
     }
 
     private fun showSecurityAlertNotification() {
+        showStatusNotification(
+            "Aparelho protegido",
+            "Foram detectadas tentativas de acesso não autorizado."
+        )
+    }
+
+    private fun showStatusNotification(title: String, text: String) {
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(
             SECURITY_ALERT_NOTIFICATION_ID,
             NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_shield)
-                .setContentTitle("Aparelho protegido")
-                .setContentText("Foram detectadas tentativas de acesso não autorizado.")
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()
@@ -143,6 +193,7 @@ class SecurityMonitorService : LifecycleService() {
 
     companion object {
         const val ACTION_INTRUSION_DETECTED = "com.autombot.security.action.INTRUSION_DETECTED"
+        const val ACTION_TEST_ALERT = "com.autombot.security.action.TEST_ALERT"
         const val ACTION_FIND_DEVICE = "com.autombot.security.action.FIND_DEVICE"
         const val ACTION_STOP_ALARM = "com.autombot.security.action.STOP_ALARM"
 
