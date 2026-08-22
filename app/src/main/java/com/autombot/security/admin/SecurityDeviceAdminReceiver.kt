@@ -5,15 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.autombot.security.service.SecurityMonitorService
+import com.autombot.security.ui.IntrusionCaptureActivity
 import com.autombot.security.util.PrefsManager
 
-/**
- * Recebe os callbacks do sistema Android sobre tentativas de desbloqueio de tela.
- *
- * onPasswordFailed() dispara toda vez que o usuário erra o PIN/senha/padrão na
- * tela de bloqueio — é exatamente o gatilho que precisamos para o cenário do
- * "celular esquecido em algum lugar e alguém tentando acessar".
- */
 class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
 
     override fun onEnabled(context: Context, intent: Intent) {
@@ -30,25 +24,39 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         super.onPasswordFailed(context, intent)
 
         val prefs = PrefsManager(context)
-        if (!prefs.monitoringEnabled) {
-            return
-        }
+        if (!prefs.monitoringEnabled) return
 
         val attempts = prefs.incrementFailedAttempts()
         Log.w(TAG, "Tentativa de senha incorreta detectada. Total: $attempts")
 
         if (attempts >= prefs.failedAttemptsThreshold) {
-            // Aciona o serviço para tirar foto + alarme + enviar e-mail
+            // Mantém sirene/notificação/fallback de e-mail mesmo se o Android
+            // bloquear a abertura da Activity a partir do background.
             val serviceIntent = Intent(context, SecurityMonitorService::class.java).apply {
                 action = SecurityMonitorService.ACTION_INTRUSION_DETECTED
             }
             context.startForegroundService(serviceIntent)
+
+            // Melhor esforço: torna o app visível para permitir uso legítimo da
+            // câmera no Android moderno. Se o fabricante bloquear a Activity,
+            // o serviço envia localização/e-mail sem foto após o timeout.
+            runCatching {
+                val captureIntent = Intent(context, IntrusionCaptureActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+                }
+                context.startActivity(captureIntent)
+            }.onFailure {
+                Log.e(TAG, "Não foi possível abrir a tela de captura", it)
+            }
         }
     }
 
     override fun onPasswordSucceeded(context: Context, intent: Intent) {
         super.onPasswordSucceeded(context, intent)
-        // Senha certa digitada: zera o contador, é o dono desbloqueando normalmente
         PrefsManager(context).resetFailedAttempts()
         Log.i(TAG, "Senha correta digitada — contador de tentativas zerado")
     }
