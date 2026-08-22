@@ -23,9 +23,9 @@ class ExperimentalFeaturesActivity : AppCompatActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
 
-        binding.switchStatusBar.isChecked = prefs.experimentalStatusBarProtection
-        binding.switchPowerMenu.isChecked = prefs.experimentalPowerMenuProtection
-        binding.switchCaptureOnSystemUi.isChecked = prefs.experimentalCaptureOnSystemUi
+        binding.switchStatusBar.isChecked = prefs.experimentalStatusBarBlockEnabled
+        binding.switchPowerMenu.isChecked = prefs.experimentalPowerProtectionEnabled
+        binding.switchCaptureOnSystemUi.isChecked = false
 
         refreshCapabilityState()
 
@@ -33,25 +33,27 @@ class ExperimentalFeaturesActivity : AppCompatActivity() {
             if (!binding.switchStatusBar.isEnabled) return@setOnCheckedChangeListener
             val applied = policy.setStatusBarDisabled(enabled)
             if (applied) {
-                prefs.experimentalStatusBarProtection = enabled
+                prefs.experimentalStatusBarBlockEnabled = enabled
                 Toast.makeText(
                     this,
                     if (enabled) "Sombra de notificações bloqueada" else "Sombra de notificações liberada",
                     Toast.LENGTH_SHORT
                 ).show()
             } else {
-                binding.switchStatusBar.isChecked = prefs.experimentalStatusBarProtection
+                binding.switchStatusBar.isChecked = prefs.experimentalStatusBarBlockEnabled
                 Toast.makeText(this, "Não foi possível aplicar esta política", Toast.LENGTH_LONG).show()
             }
         }
 
         binding.switchPowerMenu.setOnCheckedChangeListener { _, enabled ->
             if (!binding.switchPowerMenu.isEnabled) return@setOnCheckedChangeListener
-            prefs.experimentalPowerMenuProtection = enabled
+            prefs.experimentalPowerProtectionEnabled = enabled
         }
 
-        binding.switchCaptureOnSystemUi.setOnCheckedChangeListener { _, enabled ->
-            prefs.experimentalCaptureOnSystemUi = enabled
+        binding.switchCaptureOnSystemUi.setOnCheckedChangeListener { _, _ ->
+            // Não persistimos esta opção: o Android não fornece evento oficial
+            // para abertura do menu de energia/painel rápido em aparelhos comuns.
+            binding.switchCaptureOnSystemUi.isChecked = false
         }
     }
 
@@ -76,6 +78,6 @@ class ExperimentalFeaturesActivity : AppCompatActivity() {
         binding.switchCaptureOnSystemUi.isEnabled = false
         binding.tvCaptureOnSystemUiDetail.text =
             "O Android não fornece um evento oficial informando que o menu de energia ou a sombra foram abertos. " +
-                "A captura continua vinculada aos eventos de intrusão já suportados pelo AutomBot Security."
+                "A captura continua vinculada aos eventos de intrusão suportados pelo AutomBot Security."
     }
 }
