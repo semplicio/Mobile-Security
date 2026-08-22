@@ -56,24 +56,32 @@ class PrefsManager(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_OWNER_NOTIFICATION, value).apply()
 
     var showAlertMessageEnabled: Boolean
-        get() = prefs.getBoolean(KEY_SHOW_MESSAGE, false)
+        get() = prefs.getBoolean(KEY_SHOW_MESSAGE, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_MESSAGE, value).apply()
+
+    var securityMessage: String
+        get() = prefs.getString(KEY_SECURITY_MESSAGE, DEFAULT_SECURITY_MESSAGE) ?: DEFAULT_SECURITY_MESSAGE
+        set(value) = prefs.edit().putString(KEY_SECURITY_MESSAGE, value.ifBlank { DEFAULT_SECURITY_MESSAGE }).apply()
+
+    var recordAudioEnabled: Boolean
+        get() = prefs.getBoolean(KEY_RECORD_AUDIO, false)
+        set(value) = prefs.edit().putBoolean(KEY_RECORD_AUDIO, value).apply()
+
+    var recordVideoEnabled: Boolean
+        get() = prefs.getBoolean(KEY_RECORD_VIDEO, false)
+        set(value) = prefs.edit().putBoolean(KEY_RECORD_VIDEO, value).apply()
 
     var appLockEnabled: Boolean
         get() = prefs.getBoolean(KEY_APP_LOCK, false)
         set(value) = prefs.edit().putBoolean(KEY_APP_LOCK, value).apply()
 
-    var experimentalPowerMenuProtection: Boolean
-        get() = prefs.getBoolean(KEY_EXPERIMENTAL_POWER_MENU, false)
-        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_POWER_MENU, value).apply()
+    var experimentalPowerProtectionEnabled: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_POWER, false)
+        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_POWER, value).apply()
 
-    var experimentalStatusBarProtection: Boolean
+    var experimentalStatusBarBlockEnabled: Boolean
         get() = prefs.getBoolean(KEY_EXPERIMENTAL_STATUS_BAR, false)
         set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_STATUS_BAR, value).apply()
-
-    var experimentalCaptureOnSystemUi: Boolean
-        get() = prefs.getBoolean(KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI, false)
-        set(value) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI, value).apply()
 
     fun incrementFailedAttempts(): Int {
         val next = currentFailedAttempts + 1
@@ -103,11 +111,14 @@ class PrefsManager(context: Context) {
         private const val KEY_ALARM_ENABLED = "alarm_enabled"
         private const val KEY_OWNER_NOTIFICATION = "owner_notification_enabled"
         private const val KEY_SHOW_MESSAGE = "show_alert_message_enabled"
+        private const val KEY_SECURITY_MESSAGE = "security_message"
+        private const val KEY_RECORD_AUDIO = "record_audio_enabled"
+        private const val KEY_RECORD_VIDEO = "record_video_enabled"
         private const val KEY_APP_LOCK = "app_lock_enabled"
-        private const val KEY_EXPERIMENTAL_POWER_MENU = "experimental_power_menu_protection"
-        private const val KEY_EXPERIMENTAL_STATUS_BAR = "experimental_status_bar_protection"
-        private const val KEY_EXPERIMENTAL_CAPTURE_SYSTEM_UI = "experimental_capture_system_ui"
+        private const val KEY_EXPERIMENTAL_POWER = "experimental_power_protection"
+        private const val KEY_EXPERIMENTAL_STATUS_BAR = "experimental_status_bar_block"
 
         const val DEFAULT_THRESHOLD = 2
+        const val DEFAULT_SECURITY_MESSAGE = "Aparelho protegido pelo AutomBot Security. Tentativa de acesso registrada."
     }
 }
