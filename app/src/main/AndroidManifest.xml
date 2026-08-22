@@ -48,14 +48,6 @@
             android:label="Recursos experimentais" />
 
         <activity
-            android:name=".ui.SafeModeActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:theme="@style/Theme.AutomBotSecurity" />
-
-        <activity
             android:name=".ui.IntrusionCaptureActivity"
             android:exported="false"
             android:excludeFromRecents="true"
