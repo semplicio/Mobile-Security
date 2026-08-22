@@ -27,6 +27,13 @@ class PrefsManager(context: Context) {
         get() = prefs.getString(KEY_GOOGLE_ACCOUNT_EMAIL, "") ?: ""
         set(value) = prefs.edit().putString(KEY_GOOGLE_ACCOUNT_EMAIL, value).apply()
 
+    var googleAccountConnected: Boolean
+        get() = prefs.getBoolean(
+            KEY_GOOGLE_ACCOUNT_CONNECTED,
+            googleAccountEmail.contains("@")
+        )
+        set(value) = prefs.edit().putBoolean(KEY_GOOGLE_ACCOUNT_CONNECTED, value).apply()
+
     var smtpHost: String
         get() = prefs.getString(KEY_SMTP_HOST, "smtp.hostinger.com") ?: "smtp.hostinger.com"
         set(value) = prefs.edit().putString(KEY_SMTP_HOST, value).apply()
@@ -101,7 +108,8 @@ class PrefsManager(context: Context) {
         currentFailedAttempts = 0
     }
 
-    fun isGmailConfigured(): Boolean = googleAccountEmail.isNotBlank()
+    fun isGmailConfigured(): Boolean =
+        googleAccountConnected || googleAccountEmail.contains("@")
 
     fun isEmailConfigured(): Boolean = destinationEmail.isNotBlank()
 
@@ -112,6 +120,7 @@ class PrefsManager(context: Context) {
         private const val KEY_DEST_EMAIL = "destination_email"
         private const val KEY_ALERT_TRANSPORT = "alert_transport"
         private const val KEY_GOOGLE_ACCOUNT_EMAIL = "google_account_email"
+        private const val KEY_GOOGLE_ACCOUNT_CONNECTED = "google_account_connected"
         private const val KEY_SMTP_HOST = "smtp_host"
         private const val KEY_SMTP_PORT = "smtp_port"
         private const val KEY_SMTP_USER = "smtp_user"
