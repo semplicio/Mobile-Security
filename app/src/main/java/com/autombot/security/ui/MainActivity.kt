@@ -23,7 +23,7 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* resultados tratados em refreshUiState() */ refreshUiState() }
+    ) { refreshUiState() }
 
     private val deviceAdminLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -56,6 +56,10 @@ class MainActivity : AppCompatActivity() {
                     action = SecurityMonitorService.ACTION_STOP_ALARM
                 }
             )
+        }
+
+        binding.btnEvidence.setOnClickListener {
+            startActivity(Intent(this, EvidenceActivity::class.java))
         }
 
         binding.btnSettings.setOnClickListener {
@@ -116,8 +120,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshUiState() {
         val adminActive = devicePolicyManager.isAdminActive(adminComponent)
-        binding.switchMonitoring.isChecked = prefs.monitoringEnabled && adminActive
-        binding.tvStatus.text = if (prefs.monitoringEnabled && adminActive)
+        val shouldBeChecked = prefs.monitoringEnabled && adminActive
+        if (binding.switchMonitoring.isChecked != shouldBeChecked) {
+            binding.switchMonitoring.isChecked = shouldBeChecked
+        }
+        binding.tvStatus.text = if (shouldBeChecked)
             getString(com.autombot.security.R.string.status_protected)
         else
             getString(com.autombot.security.R.string.status_unprotected)
