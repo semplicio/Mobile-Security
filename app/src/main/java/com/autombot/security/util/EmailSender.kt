@@ -1,6 +1,7 @@
 package com.autombot.security.util
 
 import android.util.Log
+import com.autombot.security.BuildConfig
 import java.io.File
 import java.util.Properties
 import javax.activation.DataHandler
@@ -16,70 +17,82 @@ import javax.mail.internet.MimeMultipart
 
 class EmailSender(private val prefs: PrefsManager) {
 
-    fun sendIntrusionAlert(photoFiles: List<File>, mapsLink: String?): Boolean {
-        if (!prefs.ownerNotificationEnabled || !prefs.isEmailConfigured()) {
-            Log.w(TAG, "Envio ao proprietário desativado ou e-mail não configurado")
+    fun sendIntrusionAlert(
+        evidence: List<File>,
+        mapsLink: String?,
+        isTest: Boolean = false
+    ): Boolean {
+        if (prefs.destinationEmail.isBlank()) {
+            Log.w(TAG, "E-mail do proprietário não configurado")
+            return false
+        }
+        if (BuildConfig.SMTP_USER.isBlank() || BuildConfig.SMTP_PASSWORD.isBlank()) {
+            Log.e(TAG, "Credenciais administrativas SMTP não foram fornecidas no build")
             return false
         }
 
         return try {
+            val validEvidence = evidence.filter { it.exists() && it.isFile }
+            val photos = validEvidence.count { it.extension.equals("jpg", true) || it.extension.equals("jpeg", true) }
+            val audios = validEvidence.count { it.extension.equals("m4a", true) }
+            val videos = validEvidence.count { it.extension.equals("mp4", true) }
+
             val session = buildSession()
             val message = MimeMessage(session).apply {
-                setFrom(InternetAddress(prefs.smtpUser))
+                setFrom(InternetAddress(BuildConfig.SMTP_USER))
                 setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
-                subject = "AutomBot Security: tentativa de acesso não autorizado"
+                subject = if (isTest) {
+                    "AutomBot Security: teste de alerta"
+                } else {
+                    "AutomBot Security: tentativa de acesso não autorizado"
+                }
             }
 
             val bodyText = buildString {
-                append("O AutomBot Security detectou tentativas incorretas de desbloqueio.\n\n")
-                append("Tentativas registradas: ${prefs.currentFailedAttempts}\n")
-                append("Evidências capturadas: ${photoFiles.count { it.exists() }} foto(s)\n\n")
-                if (mapsLink != null) {
-                    append("Localização aproximada:\n$mapsLink\n\n")
-                } else {
-                    append("Não foi possível obter a localização neste momento.\n\n")
-                }
-                append("Alerta automático do AutomBot Security.")
+                if (isTest) append("Este é um teste do sistema de segurança do aparelho.\n\n")
+                else append("Foram detectadas tentativas incorretas de desbloqueio no seu aparelho.\n\n")
+
+                if (mapsLink != null) append("Localização aproximada:\n$mapsLink\n\n")
+                else append("Não foi possível obter a localização no momento.\n\n")
+
+                append("Evidências anexadas:\n")
+                append("- Fotos: $photos\n")
+                append("- Áudios: $audios\n")
+                append("- Vídeos: $videos\n\n")
+                append("Mensagem automática do AutomBot Security.")
             }
 
             val multipart = MimeMultipart().apply {
                 addBodyPart(MimeBodyPart().apply { setText(bodyText, "utf-8") })
             }
 
-            photoFiles.filter { it.exists() }.forEach { photoFile ->
-                multipart.addBodyPart(MimeBodyPart().apply {
-                    dataHandler = DataHandler(FileDataSource(photoFile))
-                    fileName = photoFile.name
-                })
+            validEvidence.forEach { file ->
+                multipart.addBodyPart(
+                    MimeBodyPart().apply {
+                        dataHandler = DataHandler(FileDataSource(file))
+                        fileName = file.name
+                    }
+                )
             }
 
             message.setContent(multipart)
             Transport.send(message)
-            Log.i(TAG, "E-mail de alerta enviado com sucesso")
+            Log.i(TAG, "E-mail enviado com sucesso para ${prefs.destinationEmail}")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Falha ao enviar e-mail de alerta", e)
+            Log.e(TAG, "Falha ao enviar e-mail", e)
             false
         }
     }
 
-    fun sendIntrusionAlert(photoFile: File?, mapsLink: String?): Boolean =
-        sendIntrusionAlert(photoFile?.let { listOf(it) } ?: emptyList(), mapsLink)
-
     private fun buildSession(): Session {
-        val ssl = prefs.smtpPort == 465
         val props = Properties().apply {
             put("mail.smtp.auth", "true")
-            put("mail.smtp.host", prefs.smtpHost)
-            put("mail.smtp.port", prefs.smtpPort.toString())
-            if (ssl) {
-                put("mail.smtp.ssl.enable", "true")
-                put("mail.smtp.socketFactory.port", prefs.smtpPort.toString())
-                put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory")
-                put("mail.smtp.starttls.enable", "false")
-            } else {
-                put("mail.smtp.starttls.enable", "true")
-            }
+            put("mail.smtp.host", BuildConfig.SMTP_HOST)
+            put("mail.smtp.port", BuildConfig.SMTP_PORT.toString())
+            put("mail.smtp.ssl.enable", "true")
+            put("mail.smtp.socketFactory.port", BuildConfig.SMTP_PORT.toString())
+            put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory")
             put("mail.smtp.connectiontimeout", "15000")
             put("mail.smtp.timeout", "20000")
             put("mail.smtp.writetimeout", "20000")
@@ -87,7 +100,7 @@ class EmailSender(private val prefs: PrefsManager) {
 
         return Session.getInstance(props, object : javax.mail.Authenticator() {
             override fun getPasswordAuthentication(): PasswordAuthentication =
-                PasswordAuthentication(prefs.smtpUser, prefs.smtpPassword)
+                PasswordAuthentication(BuildConfig.SMTP_USER, BuildConfig.SMTP_PASSWORD)
         })
     }
 

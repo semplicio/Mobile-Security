@@ -1,31 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Câmera para capturar foto de quem tentou desbloquear -->
     <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- Localização para encontrar o aparelho -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-
-    <!-- Envio de e-mail / rede -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Serviço em segundo plano -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Necessário para o DeviceAdminReceiver detectar tentativas de senha erradas -->
     <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:name=".AutomBotApp"
@@ -49,13 +42,25 @@
             android:exported="false"
             android:label="@string/settings_title" />
 
-        <!-- Serviço que fica escutando em segundo plano -->
+        <activity
+            android:name=".ui.ExperimentalFeaturesActivity"
+            android:exported="false"
+            android:label="Recursos experimentais" />
+
+        <activity
+            android:name=".ui.IntrusionCaptureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.AutomBotSecurity" />
+
         <service
             android:name=".service.SecurityMonitorService"
             android:exported="false"
             android:foregroundServiceType="camera|location" />
 
-        <!-- Receiver de administrador do dispositivo: detecta senha errada -->
         <receiver
             android:name=".admin.SecurityDeviceAdminReceiver"
             android:exported="true"
@@ -68,7 +73,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Reinicia o serviço após o aparelho ligar -->
         <receiver
             android:name=".receiver.BootReceiver"
             android:exported="false">

@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         val needed = mutableListOf<String>()
         val perms = mutableListOf(
             android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
             android.Manifest.permission.ACCESS_FINE_LOCATION
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
