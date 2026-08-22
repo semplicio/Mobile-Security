@@ -4,7 +4,9 @@ import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.autombot.security.service.SecurityMonitorService
+import com.autombot.security.ui.IntrusionCaptureActivity
 import com.autombot.security.util.PrefsManager
 
 class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
@@ -29,12 +31,32 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         Log.w(TAG, "Tentativa de senha incorreta detectada. Total: $attempts")
 
         if (attempts >= prefs.failedAttemptsThreshold) {
-            // Mantém o bloqueio real do Android. O app registra o evento e
-            // processa o alerta sem tentar substituir a decisão do sistema.
             val serviceIntent = Intent(context, SecurityMonitorService::class.java).apply {
                 action = SecurityMonitorService.ACTION_INTRUSION_DETECTED
             }
-            context.startForegroundService(serviceIntent)
+
+            runCatching {
+                ContextCompat.startForegroundService(context, serviceIntent)
+            }.onFailure {
+                Log.e(TAG, "Não foi possível iniciar o serviço de segurança", it)
+            }
+
+            // Abre uma tela visível e identificada do AutomBot sobre a tela
+            // bloqueada. Isso coloca o app em primeiro plano para permitir que
+            // os recursos de evidência previamente habilitados pelo proprietário
+            // sejam executados dentro das regras do Android moderno.
+            runCatching {
+                val captureIntent = Intent(context, IntrusionCaptureActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+                }
+                context.startActivity(captureIntent)
+            }.onFailure {
+                Log.e(TAG, "Não foi possível abrir a tela de registro do incidente", it)
+            }
         }
     }
 
