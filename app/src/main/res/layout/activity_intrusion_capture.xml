@@ -39,22 +39,33 @@
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tvDetail"
+            android:id="@+id/tvSecurityMessage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
             android:gravity="center"
             android:text="Registrando evidência de segurança…"
             android:textColor="#B7C8DB"
             android:textSize="15sp" />
 
         <TextView
+            android:id="@+id/tvRecordingIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Tentativa de acesso não autorizada detectada."
+            android:text=""
             android:textColor="#62F5B7"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>
