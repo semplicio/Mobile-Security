@@ -14,6 +14,7 @@ import com.autombot.security.ui.MainActivity
 import com.autombot.security.util.AlarmHelper
 import com.autombot.security.util.CameraCaptureHelper
 import com.autombot.security.util.EmailSender
+import com.autombot.security.util.GmailApiSender
 import com.autombot.security.util.LocationHelper
 import com.autombot.security.util.PrefsManager
 import java.io.File
@@ -128,23 +129,61 @@ class SecurityMonitorService : LifecycleService() {
                 return@getCurrentLocation
             }
 
-            emailExecutor.execute {
-                val success = EmailSender(prefs).sendIntrusionAlert(
+            if (prefs.alertTransport == PrefsManager.TRANSPORT_GMAIL && prefs.isGmailConfigured()) {
+                GmailApiSender(this, prefs).sendIntrusionAlert(
                     evidence = evidence,
                     mapsLink = mapsLink,
                     isTest = isTest
-                )
-
-                if (isTest) {
-                    showStatusNotification(
-                        if (success) "Teste concluído" else "Falha no envio do teste",
-                        if (success) {
-                            "Alerta enviado. Arquivos anexados: ${evidence.size}."
-                        } else {
-                            "Confira a configuração administrativa do build e a conexão de rede."
+                ) { success, detail ->
+                    if (success) {
+                        if (isTest) {
+                            showStatusNotification(
+                                "Teste concluído",
+                                "Alerta enviado pela Gmail API. Arquivos anexados: ${evidence.size}."
+                            )
                         }
-                    )
+                    } else {
+                        trySmtpFallback(evidence, mapsLink, isTest, detail)
+                    }
                 }
+            } else {
+                trySmtpFallback(
+                    evidence,
+                    mapsLink,
+                    isTest,
+                    "Conta Google ainda não conectada"
+                )
+            }
+        }
+    }
+
+    private fun trySmtpFallback(
+        evidence: List<File>,
+        mapsLink: String?,
+        isTest: Boolean,
+        gmailFailureDetail: String
+    ) {
+        emailExecutor.execute {
+            val smtpSuccess = EmailSender(prefs).sendIntrusionAlert(
+                evidence = evidence,
+                mapsLink = mapsLink,
+                isTest = isTest
+            )
+
+            if (isTest) {
+                showStatusNotification(
+                    if (smtpSuccess) "Teste concluído via fallback" else "Falha no envio do teste",
+                    if (smtpSuccess) {
+                        "Gmail OAuth indisponível; alerta enviado pelo transporte de fallback."
+                    } else {
+                        "$gmailFailureDetail. Abra Configurações e conecte novamente a conta Google."
+                    }
+                )
+            } else if (!smtpSuccess) {
+                showStatusNotification(
+                    "Alerta não enviado",
+                    "$gmailFailureDetail. Reconecte a conta Google assim que possível."
+                )
             }
         }
     }
