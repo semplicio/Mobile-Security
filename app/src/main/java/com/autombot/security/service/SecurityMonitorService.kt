@@ -29,14 +29,6 @@ class SecurityMonitorService : LifecycleService() {
     private val emailExecutor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
 
-    private val productionFallback = Runnable {
-        showStatusNotification(
-            "Evidência parcial",
-            "O Android não concluiu a captura visual; localização e alerta serão enviados."
-        )
-        sendEvidence(emptyList(), isTest = false)
-    }
-
     override fun onCreate() {
         super.onCreate()
         prefs = PrefsManager(this)
@@ -65,14 +57,14 @@ class SecurityMonitorService : LifecycleService() {
         if (prefs.alarmEnabled) alarmHelper.playAlarm()
         if (prefs.showAlertMessageEnabled) showSecurityAlertNotification()
 
-        handler.removeCallbacks(productionFallback)
-        handler.postDelayed(productionFallback, PRODUCTION_CAPTURE_TIMEOUT_MS)
+        // Em uma detecção real o alerta segue imediatamente com dados não
+        // multimídia. Câmera/microfone ficam restritos aos fluxos explicitamente
+        // iniciados pelo proprietário dentro do aplicativo.
+        sendEvidence(emptyList(), isTest = false)
         handler.postDelayed({ prefs.resetFailedAttempts() }, 5000)
     }
 
     private fun handleCapturedEvidence(intent: Intent) {
-        handler.removeCallbacks(productionFallback)
-
         val evidence = intent.getStringArrayListExtra(EXTRA_EVIDENCE_PATHS)
             .orEmpty()
             .map(::File)
@@ -81,7 +73,7 @@ class SecurityMonitorService : LifecycleService() {
         if (evidence.isEmpty()) {
             showStatusNotification(
                 "Evidência sem mídia",
-                "O alerta seguirá com localização, mas sem foto, áudio ou vídeo."
+                "O alerta seguirá com localização, mas sem arquivo de mídia."
             )
         }
 
@@ -91,7 +83,7 @@ class SecurityMonitorService : LifecycleService() {
     private fun handleTestAlert() {
         showStatusNotification(
             "Teste em andamento",
-            "Validando câmera, localização e envio do alerta."
+            "Validando recursos autorizados e envio do alerta."
         )
         captureAndSendTest()
     }
@@ -104,8 +96,8 @@ class SecurityMonitorService : LifecycleService() {
                 onComplete = { photos -> sendEvidence(photos, isTest = true) },
                 onError = {
                     showStatusNotification(
-                        "Falha na captura",
-                        "A câmera não pôde ser usada. O alerta seguirá sem foto."
+                        "Falha no teste",
+                        "Não foi possível concluir a etapa visual. O alerta seguirá sem arquivo de mídia."
                     )
                     sendEvidence(emptyList(), isTest = true)
                 }
@@ -239,7 +231,7 @@ class SecurityMonitorService : LifecycleService() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(productionFallback)
+        handler.removeCallbacksAndMessages(null)
         alarmHelper.stopAlarm()
         emailExecutor.shutdownNow()
         super.onDestroy()
@@ -257,6 +249,5 @@ class SecurityMonitorService : LifecycleService() {
         private const val ALERT_CHANNEL_ID = "autombot_security_alerts"
         private const val NOTIFICATION_ID = 1001
         private const val SECURITY_ALERT_NOTIFICATION_ID = 1002
-        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 22000L
     }
 }
