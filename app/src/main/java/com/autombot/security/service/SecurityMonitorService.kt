@@ -15,6 +15,9 @@ import com.autombot.security.util.AlarmHelper
 import com.autombot.security.util.CameraCaptureHelper
 import com.autombot.security.util.EmailSender
 import com.autombot.security.util.GmailApiSender
+import com.autombot.security.util.IncidentHistoryLogger
+import com.autombot.security.util.IncidentInfoCollector
+import com.autombot.security.util.IncidentDetails
 import com.autombot.security.util.LocationHelper
 import com.autombot.security.util.PrefsManager
 import java.io.File
@@ -57,9 +60,8 @@ class SecurityMonitorService : LifecycleService() {
         if (prefs.alarmEnabled) alarmHelper.playAlarm()
         if (prefs.showAlertMessageEnabled) showSecurityAlertNotification()
 
-        // Em uma detecção real o alerta segue imediatamente com dados não
-        // multimídia. Câmera/microfone ficam restritos aos fluxos explicitamente
-        // iniciados pelo proprietário dentro do aplicativo.
+        // O alerta real registra somente dados técnicos e de contexto que podem
+        // ser coletados sem iniciar câmera ou microfone em segundo plano.
         sendEvidence(emptyList(), isTest = false)
         handler.postDelayed({ prefs.resetFailedAttempts() }, 5000)
     }
@@ -73,7 +75,7 @@ class SecurityMonitorService : LifecycleService() {
         if (evidence.isEmpty()) {
             showStatusNotification(
                 "Evidência sem mídia",
-                "O alerta seguirá com localização, mas sem arquivo de mídia."
+                "O alerta seguirá com os dados disponíveis, sem arquivo de mídia."
             )
         }
 
@@ -110,6 +112,11 @@ class SecurityMonitorService : LifecycleService() {
     private fun sendEvidence(evidence: List<File>, isTest: Boolean) {
         locationHelper.getCurrentLocation { location ->
             val mapsLink = location?.let { locationHelper.mapsLink(it) }
+            val incident = IncidentInfoCollector.collect(this, prefs)
+
+            if (!isTest) {
+                IncidentHistoryLogger.record(this, incident, mapsLink)
+            }
 
             if (!prefs.ownerNotificationEnabled) {
                 if (isTest) {
@@ -125,6 +132,7 @@ class SecurityMonitorService : LifecycleService() {
                 GmailApiSender(this, prefs).sendIntrusionAlert(
                     evidence = evidence,
                     mapsLink = mapsLink,
+                    incident = incident,
                     isTest = isTest
                 ) { success, detail ->
                     if (success) {
@@ -135,13 +143,14 @@ class SecurityMonitorService : LifecycleService() {
                             )
                         }
                     } else {
-                        trySmtpFallback(evidence, mapsLink, isTest, detail)
+                        trySmtpFallback(evidence, mapsLink, incident, isTest, detail)
                     }
                 }
             } else {
                 trySmtpFallback(
                     evidence,
                     mapsLink,
+                    incident,
                     isTest,
                     "Conta Google ainda não conectada"
                 )
@@ -152,6 +161,7 @@ class SecurityMonitorService : LifecycleService() {
     private fun trySmtpFallback(
         evidence: List<File>,
         mapsLink: String?,
+        incident: IncidentDetails,
         isTest: Boolean,
         gmailFailureDetail: String
     ) {
@@ -159,6 +169,7 @@ class SecurityMonitorService : LifecycleService() {
             val smtpSuccess = EmailSender(prefs).sendIntrusionAlert(
                 evidence = evidence,
                 mapsLink = mapsLink,
+                incident = incident,
                 isTest = isTest
             )
 
