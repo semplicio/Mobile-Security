@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.autombot.security.service.SecurityMonitorService
-import com.autombot.security.ui.SafeModeActivity
 import com.autombot.security.util.PrefsManager
 
 class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
@@ -30,25 +29,12 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         Log.w(TAG, "Tentativa de senha incorreta detectada. Total: $attempts")
 
         if (attempts >= prefs.failedAttemptsThreshold) {
+            // Mantém o bloqueio real do Android. O app registra o evento e
+            // processa o alerta sem tentar substituir a decisão do sistema.
             val serviceIntent = Intent(context, SecurityMonitorService::class.java).apply {
                 action = SecurityMonitorService.ACTION_INTRUSION_DETECTED
             }
             context.startForegroundService(serviceIntent)
-
-            // Abre uma interface alternativa do próprio AutomBot. Ela não
-            // substitui o desbloqueio do Android e não inicia câmera/microfone.
-            runCatching {
-                val safeModeIntent = Intent(context, SafeModeActivity::class.java).apply {
-                    addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    )
-                }
-                context.startActivity(safeModeIntent)
-            }.onFailure {
-                Log.e(TAG, "Não foi possível abrir o modo seguro", it)
-            }
         }
     }
 
