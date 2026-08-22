@@ -70,8 +70,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:text="@string/switch_enable_protection"
-                android:textColor="#D7E7F8"
-                app:buttonTint="#29D3FF" />
+                android:textColor="#D7E7F8" />
         </LinearLayout>
 
         <TextView
@@ -103,6 +102,17 @@
             android:layout_height="56dp"
             android:layout_marginTop="12dp"
             android:text="@string/btn_stop_alarm"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            app:cornerRadius="18dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEvidence"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="Ver evidências capturadas"
             android:textAllCaps="false"
             android:textSize="16sp"
             app:cornerRadius="18dp" />
