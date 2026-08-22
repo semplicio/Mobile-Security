@@ -1,8 +1,12 @@
 package com.autombot.security.ui
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.autombot.security.databinding.ActivitySettingsBinding
+import com.autombot.security.service.SecurityMonitorService
 import com.autombot.security.util.PrefsManager
 
 class SettingsActivity : AppCompatActivity() {
@@ -22,8 +26,22 @@ class SettingsActivity : AppCompatActivity() {
             binding.etPhotoCount.isEnabled = enabled
         }
 
+        binding.btnTestAlert.setOnClickListener {
+            saveValues()
+            val intent = Intent(this, SecurityMonitorService::class.java).apply {
+                action = SecurityMonitorService.ACTION_TEST_ALERT
+            }
+            ContextCompat.startForegroundService(this, intent)
+            Toast.makeText(
+                this,
+                "Teste iniciado. Confira Evidências e o e-mail do proprietário.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
         binding.btnSave.setOnClickListener {
             saveValues()
+            Toast.makeText(this, "Configurações salvas", Toast.LENGTH_SHORT).show()
             finish()
         }
     }
@@ -31,11 +49,6 @@ class SettingsActivity : AppCompatActivity() {
     private fun loadCurrentValues() = with(binding) {
         etThreshold.setText(prefs.failedAttemptsThreshold.toString())
         etDestEmail.setText(prefs.destinationEmail)
-        etSmtpHost.setText(prefs.smtpHost)
-        etSmtpPort.setText(prefs.smtpPort.toString())
-        etSmtpUser.setText(prefs.smtpUser)
-        etSmtpPass.setText(prefs.smtpPassword)
-
         switchCapturePhotos.isChecked = prefs.capturePhotosEnabled
         etPhotoCount.setText(prefs.photoCount.toString())
         etPhotoCount.isEnabled = prefs.capturePhotosEnabled
@@ -49,11 +62,6 @@ class SettingsActivity : AppCompatActivity() {
         prefs.failedAttemptsThreshold =
             etThreshold.text?.toString()?.toIntOrNull() ?: PrefsManager.DEFAULT_THRESHOLD
         prefs.destinationEmail = etDestEmail.text?.toString()?.trim().orEmpty()
-        prefs.smtpHost = etSmtpHost.text?.toString()?.trim().orEmpty().ifBlank { "smtp.hostinger.com" }
-        prefs.smtpPort = etSmtpPort.text?.toString()?.toIntOrNull() ?: 465
-        prefs.smtpUser = etSmtpUser.text?.toString()?.trim().orEmpty()
-        prefs.smtpPassword = etSmtpPass.text?.toString().orEmpty()
-
         prefs.capturePhotosEnabled = switchCapturePhotos.isChecked
         prefs.photoCount = etPhotoCount.text?.toString()?.toIntOrNull() ?: 3
         prefs.alarmEnabled = switchAlarm.isChecked
