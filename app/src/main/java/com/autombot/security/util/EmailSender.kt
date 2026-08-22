@@ -20,6 +20,7 @@ class EmailSender(private val prefs: PrefsManager) {
     fun sendIntrusionAlert(
         evidence: List<File>,
         mapsLink: String?,
+        incident: IncidentDetails? = null,
         isTest: Boolean = false
     ): Boolean {
         if (prefs.destinationEmail.isBlank()) {
@@ -49,17 +50,44 @@ class EmailSender(private val prefs: PrefsManager) {
             }
 
             val bodyText = buildString {
-                if (isTest) append("Este é um teste do sistema de segurança do aparelho.\n\n")
-                else append("Foram detectadas tentativas incorretas de desbloqueio no seu aparelho.\n\n")
+                append("AUTOMBOT SECURITY — ")
+                append(if (isTest) "TESTE DE ALERTA" else "ALERTA DE SEGURANÇA")
+                append("\n\n")
 
-                if (mapsLink != null) append("Localização aproximada:\n$mapsLink\n\n")
-                else append("Não foi possível obter a localização no momento.\n\n")
+                if (isTest) {
+                    append("Este é um teste do sistema de segurança do aparelho.\n\n")
+                } else {
+                    append("Foi detectada uma sequência de tentativas incorretas de desbloqueio no aparelho monitorado.\n\n")
+                }
 
-                append("Evidências anexadas:\n")
-                append("- Fotos: $photos\n")
-                append("- Áudios: $audios\n")
-                append("- Vídeos: $videos\n\n")
-                append("Mensagem automática do AutomBot Security.")
+                incident?.let {
+                    append("DETALHES DO EVENTO\n")
+                    append("Data/hora: ${it.eventTime}\n")
+                    append("Tentativas incorretas: ${it.failedAttempts}\n")
+                    append("Dispositivo: ${it.device}\n")
+                    append("Sistema: ${it.androidVersion}\n")
+                    append("Bateria: ${it.batteryDescription()}\n")
+                    append("Conexão: ${it.networkType}\n")
+                    append("Versão do app: ${it.appVersion}\n\n")
+                }
+
+                append("LOCALIZAÇÃO\n")
+                if (mapsLink != null) {
+                    append("Localização aproximada: $mapsLink\n\n")
+                } else {
+                    append("Não foi possível obter a localização no momento.\n\n")
+                }
+
+                append("MÍDIA DO EVENTO\n")
+                if (validEvidence.isEmpty()) {
+                    append("Captura de mídia não realizada automaticamente neste evento.\n")
+                } else {
+                    append("Fotos anexadas: $photos\n")
+                    append("Áudios anexados: $audios\n")
+                    append("Vídeos anexados: $videos\n")
+                }
+
+                append("\nMensagem automática do AutomBot Security.")
             }
 
             val multipart = MimeMultipart().apply {
