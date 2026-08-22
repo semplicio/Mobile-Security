@@ -25,6 +25,9 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchCapturePhotos.setOnCheckedChangeListener { _, enabled ->
             binding.etPhotoCount.isEnabled = enabled
         }
+        binding.switchShowMessage.setOnCheckedChangeListener { _, enabled ->
+            binding.etSecurityMessage.isEnabled = enabled
+        }
 
         binding.btnExperimentalFeatures.setOnClickListener {
             startActivity(Intent(this, ExperimentalFeaturesActivity::class.java))
@@ -56,9 +59,13 @@ class SettingsActivity : AppCompatActivity() {
         switchCapturePhotos.isChecked = prefs.capturePhotosEnabled
         etPhotoCount.setText(prefs.photoCount.toString())
         etPhotoCount.isEnabled = prefs.capturePhotosEnabled
+        switchRecordAudio.isChecked = prefs.recordAudioEnabled
+        switchRecordVideo.isChecked = prefs.recordVideoEnabled
         switchAlarm.isChecked = prefs.alarmEnabled
         switchOwnerNotification.isChecked = prefs.ownerNotificationEnabled
         switchShowMessage.isChecked = prefs.showAlertMessageEnabled
+        etSecurityMessage.setText(prefs.securityMessage)
+        etSecurityMessage.isEnabled = prefs.showAlertMessageEnabled
         switchAppLock.isChecked = prefs.appLockEnabled
     }
 
@@ -68,9 +75,12 @@ class SettingsActivity : AppCompatActivity() {
         prefs.destinationEmail = etDestEmail.text?.toString()?.trim().orEmpty()
         prefs.capturePhotosEnabled = switchCapturePhotos.isChecked
         prefs.photoCount = etPhotoCount.text?.toString()?.toIntOrNull() ?: 3
+        prefs.recordAudioEnabled = switchRecordAudio.isChecked
+        prefs.recordVideoEnabled = switchRecordVideo.isChecked
         prefs.alarmEnabled = switchAlarm.isChecked
         prefs.ownerNotificationEnabled = switchOwnerNotification.isChecked
         prefs.showAlertMessageEnabled = switchShowMessage.isChecked
+        prefs.securityMessage = etSecurityMessage.text?.toString()?.trim().orEmpty()
         prefs.appLockEnabled = switchAppLock.isChecked
     }
 }
