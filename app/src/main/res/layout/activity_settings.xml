@@ -15,20 +15,28 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="CONFIGURAÇÕES DE PROTEÇÃO"
+            android:text="AUTOMBOT SECURITY"
             android:textColor="#6EE7FF"
             android:textSize="13sp"
             android:textStyle="bold"
-            android:letterSpacing="0.12" />
+            android:letterSpacing="0.14" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Defina como o agente reage a acessos suspeitos."
+            android:text="Política de resposta"
             android:textColor="#FFFFFF"
-            android:textSize="24sp"
+            android:textSize="26sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Escolha quais ações serão executadas quando houver tentativa de acesso ao aparelho."
+            android:textColor="#9DB1C8"
+            android:textSize="14sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -52,7 +60,6 @@
                 android:layout_marginTop="12dp"
                 android:hint="@string/label_threshold"
                 app:boxBackgroundMode="outline">
-
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etThreshold"
                     android:layout_width="match_parent"
@@ -73,18 +80,79 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DESTINO DOS ALERTAS"
+                android:text="AÇÕES DE ALERTA"
                 android:textColor="#62F5B7"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchCapturePhotos"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:text="Capturar fotos"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="Quantidade de fotos (1 a 5)"
+                app:boxBackgroundMode="outline">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPhotoCount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:textColor="#FFFFFF" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchAlarm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Tocar sirene de alerta"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchShowMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Mostrar mensagem de aparelho protegido"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_security_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NOTIFICAÇÕES DE ALERTA"
+                android:textColor="#62F5B7"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchOwnerNotification"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Enviar alerta ao proprietário"
+                android:textColor="#FFFFFF" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:hint="@string/label_dest_email"
                 app:boxBackgroundMode="outline">
-
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDestEmail"
                     android:layout_width="match_parent"
@@ -105,10 +173,51 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ENVIO SMTP"
+                android:text="PROTEÇÃO DO APLICATIVO"
                 android:textColor="#62F5B7"
                 android:textSize="12sp"
                 android:textStyle="bold" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchAppLock"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Exigir bloqueio para abrir configurações"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="A opção prepara o app para autenticação local; a validação por biometria/PIN será vinculada na próxima etapa."
+                android:textColor="#9DB1C8"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_security_card"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TRANSPORTE DE ALERTAS"
+                android:textColor="#62F5B7"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Configuração administrativa do remetente. Não use a senha principal de uma conta pessoal."
+                android:textColor="#9DB1C8"
+                android:textSize="12sp" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
@@ -165,14 +274,6 @@
                     android:inputType="textPassword"
                     android:textColor="#FFFFFF" />
             </com.google.android.material.textfield.TextInputLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/smtp_help_text"
-                android:textColor="#9DB1C8"
-                android:textSize="12sp" />
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
@@ -180,6 +281,7 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="20dp"
+            android:layout_marginBottom="24dp"
             android:text="@string/btn_save"
             android:textAllCaps="false"
             android:textSize="16sp"
