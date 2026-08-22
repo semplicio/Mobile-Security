@@ -80,8 +80,20 @@ class GmailApiSender(
             }
             .addOnFailureListener { error ->
                 Log.e(TAG, "Falha ao obter autorização Google", error)
-                onResult(false, error.message ?: "Falha de autorização Google")
+                onResult(false, googleAuthorizationErrorMessage(error))
             }
+    }
+
+    private fun googleAuthorizationErrorMessage(error: Throwable): String {
+        val detail = error.message.orEmpty()
+        return if (
+            detail.contains("UNREGISTERED_ON_API_CONSOLE", ignoreCase = true) ||
+            detail.contains("status=UNREGISTERED", ignoreCase = true)
+        ) {
+            "Cliente OAuth Android não registrado para a assinatura deste APK"
+        } else {
+            detail.ifBlank { "Falha de autorização Google" }
+        }
     }
 
     private fun sendWithAccessToken(
