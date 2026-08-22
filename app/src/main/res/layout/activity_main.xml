@@ -70,8 +70,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:text="@string/switch_enable_protection"
-                android:textColor="#D7E7F8"
-                app:buttonTint="#29D3FF" />
+                android:textColor="#D7E7F8" />
         </LinearLayout>
 
         <TextView

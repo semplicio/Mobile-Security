@@ -14,16 +14,36 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-/**
- * Captura uma foto usando a câmera frontal (quem está mexendo no aparelho),
- * sem precisar mostrar preview na tela — usada quando o app detecta uma
- * tentativa de invasão.
- *
- * Requer um LifecycleOwner. Na base, o SecurityMonitorService implementa
- * LifecycleOwner (via LifecycleService) para poder acionar isso mesmo sem
- * Activity em primeiro plano.
- */
 class CameraCaptureHelper(private val context: Context) {
+
+    fun capturePhotos(
+        lifecycleOwner: LifecycleOwner,
+        count: Int,
+        onComplete: (List<File>) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        val target = count.coerceIn(1, 5)
+        val captured = mutableListOf<File>()
+
+        fun captureNext() {
+            if (captured.size >= target) {
+                onComplete(captured)
+                return
+            }
+            capturePhoto(
+                lifecycleOwner = lifecycleOwner,
+                onSuccess = {
+                    captured += it
+                    captureNext()
+                },
+                onError = {
+                    if (captured.isNotEmpty()) onComplete(captured) else onError(it)
+                }
+            )
+        }
+
+        captureNext()
+    }
 
     fun capturePhoto(
         lifecycleOwner: LifecycleOwner,
@@ -35,20 +55,19 @@ class CameraCaptureHelper(private val context: Context) {
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
-
                 val imageCapture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
 
-                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, imageCapture)
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    imageCapture
+                )
 
                 val outputDir = File(context.filesDir, "intrusion_photos").apply { mkdirs() }
-                val fileName = "intruso_${timestamp()}.jpg"
-                val photoFile = File(outputDir, fileName)
-
+                val photoFile = File(outputDir, "intruso_${timestamp()}_${System.nanoTime()}.jpg")
                 val outputOptions = OutputFileOptions.Builder(photoFile).build()
 
                 imageCapture.takePicture(

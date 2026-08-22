@@ -5,10 +5,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.autombot.security.databinding.ActivitySettingsBinding
 import com.autombot.security.util.PrefsManager
 
-/**
- * Tela de configurações: limite de tentativas erradas para disparar o alerta,
- * e-mail de destino e credenciais SMTP do remetente.
- */
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
@@ -22,28 +18,47 @@ class SettingsActivity : AppCompatActivity() {
 
         loadCurrentValues()
 
+        binding.switchCapturePhotos.setOnCheckedChangeListener { _, enabled ->
+            binding.etPhotoCount.isEnabled = enabled
+        }
+
         binding.btnSave.setOnClickListener {
             saveValues()
             finish()
         }
     }
 
-    private fun loadCurrentValues() {
-        binding.etThreshold.setText(prefs.failedAttemptsThreshold.toString())
-        binding.etDestEmail.setText(prefs.destinationEmail)
-        binding.etSmtpHost.setText(prefs.smtpHost)
-        binding.etSmtpPort.setText(prefs.smtpPort.toString())
-        binding.etSmtpUser.setText(prefs.smtpUser)
-        binding.etSmtpPass.setText(prefs.smtpPassword)
+    private fun loadCurrentValues() = with(binding) {
+        etThreshold.setText(prefs.failedAttemptsThreshold.toString())
+        etDestEmail.setText(prefs.destinationEmail)
+        etSmtpHost.setText(prefs.smtpHost)
+        etSmtpPort.setText(prefs.smtpPort.toString())
+        etSmtpUser.setText(prefs.smtpUser)
+        etSmtpPass.setText(prefs.smtpPassword)
+
+        switchCapturePhotos.isChecked = prefs.capturePhotosEnabled
+        etPhotoCount.setText(prefs.photoCount.toString())
+        etPhotoCount.isEnabled = prefs.capturePhotosEnabled
+        switchAlarm.isChecked = prefs.alarmEnabled
+        switchOwnerNotification.isChecked = prefs.ownerNotificationEnabled
+        switchShowMessage.isChecked = prefs.showAlertMessageEnabled
+        switchAppLock.isChecked = prefs.appLockEnabled
     }
 
-    private fun saveValues() {
+    private fun saveValues() = with(binding) {
         prefs.failedAttemptsThreshold =
-            binding.etThreshold.text.toString().toIntOrNull() ?: PrefsManager.DEFAULT_THRESHOLD
-        prefs.destinationEmail = binding.etDestEmail.text.toString().trim()
-        prefs.smtpHost = binding.etSmtpHost.text.toString().trim()
-        prefs.smtpPort = binding.etSmtpPort.text.toString().toIntOrNull() ?: 587
-        prefs.smtpUser = binding.etSmtpUser.text.toString().trim()
-        prefs.smtpPassword = binding.etSmtpPass.text.toString()
+            etThreshold.text?.toString()?.toIntOrNull() ?: PrefsManager.DEFAULT_THRESHOLD
+        prefs.destinationEmail = etDestEmail.text?.toString()?.trim().orEmpty()
+        prefs.smtpHost = etSmtpHost.text?.toString()?.trim().orEmpty().ifBlank { "smtp.hostinger.com" }
+        prefs.smtpPort = etSmtpPort.text?.toString()?.toIntOrNull() ?: 465
+        prefs.smtpUser = etSmtpUser.text?.toString()?.trim().orEmpty()
+        prefs.smtpPassword = etSmtpPass.text?.toString().orEmpty()
+
+        prefs.capturePhotosEnabled = switchCapturePhotos.isChecked
+        prefs.photoCount = etPhotoCount.text?.toString()?.toIntOrNull() ?: 3
+        prefs.alarmEnabled = switchAlarm.isChecked
+        prefs.ownerNotificationEnabled = switchOwnerNotification.isChecked
+        prefs.showAlertMessageEnabled = switchShowMessage.isChecked
+        prefs.appLockEnabled = switchAppLock.isChecked
     }
 }

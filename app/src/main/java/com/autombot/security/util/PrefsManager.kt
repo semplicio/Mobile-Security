@@ -3,52 +3,65 @@ package com.autombot.security.util
 import android.content.Context
 import android.content.SharedPreferences
 
-/**
- * Centraliza todas as configurações do AutomBot Security.
- * Guardado em SharedPreferences simples na base (versão futura pode migrar
- * credenciais sensíveis para EncryptedSharedPreferences).
- */
 class PrefsManager(context: Context) {
-
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // Quantas tentativas erradas de senha até disparar a captura + alarme
     var failedAttemptsThreshold: Int
         get() = prefs.getInt(KEY_THRESHOLD, DEFAULT_THRESHOLD)
-        set(value) = prefs.edit().putInt(KEY_THRESHOLD, value).apply()
+        set(value) = prefs.edit().putInt(KEY_THRESHOLD, value.coerceIn(1, 10)).apply()
 
-    // Contador atual de tentativas erradas (zera quando a senha certa é digitada)
     var currentFailedAttempts: Int
         get() = prefs.getInt(KEY_CURRENT_ATTEMPTS, 0)
         set(value) = prefs.edit().putInt(KEY_CURRENT_ATTEMPTS, value).apply()
 
-    // E-mail de destino (o dono do aparelho) que vai receber os alertas
     var destinationEmail: String
         get() = prefs.getString(KEY_DEST_EMAIL, "") ?: ""
         set(value) = prefs.edit().putString(KEY_DEST_EMAIL, value).apply()
 
-    // Conta SMTP remetente (pode ser a mesma conta do usuário, ex.: Gmail com senha de app)
     var smtpHost: String
-        get() = prefs.getString(KEY_SMTP_HOST, "smtp.gmail.com") ?: "smtp.gmail.com"
+        get() = prefs.getString(KEY_SMTP_HOST, "smtp.hostinger.com") ?: "smtp.hostinger.com"
         set(value) = prefs.edit().putString(KEY_SMTP_HOST, value).apply()
 
     var smtpPort: Int
-        get() = prefs.getInt(KEY_SMTP_PORT, 587)
+        get() = prefs.getInt(KEY_SMTP_PORT, 465)
         set(value) = prefs.edit().putInt(KEY_SMTP_PORT, value).apply()
 
     var smtpUser: String
-        get() = prefs.getString(KEY_SMTP_USER, "") ?: ""
+        get() = prefs.getString(KEY_SMTP_USER, "security@autombot.com.br") ?: "security@autombot.com.br"
         set(value) = prefs.edit().putString(KEY_SMTP_USER, value).apply()
 
     var smtpPassword: String
         get() = prefs.getString(KEY_SMTP_PASS, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SMTP_PASS, value).apply()
 
-    // Liga/desliga o monitoramento
     var monitoringEnabled: Boolean
         get() = prefs.getBoolean(KEY_MONITORING_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_MONITORING_ENABLED, value).apply()
+
+    var capturePhotosEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CAPTURE_PHOTOS, true)
+        set(value) = prefs.edit().putBoolean(KEY_CAPTURE_PHOTOS, value).apply()
+
+    var photoCount: Int
+        get() = prefs.getInt(KEY_PHOTO_COUNT, 3)
+        set(value) = prefs.edit().putInt(KEY_PHOTO_COUNT, value.coerceIn(1, 5)).apply()
+
+    var alarmEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ALARM_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_ALARM_ENABLED, value).apply()
+
+    var ownerNotificationEnabled: Boolean
+        get() = prefs.getBoolean(KEY_OWNER_NOTIFICATION, true)
+        set(value) = prefs.edit().putBoolean(KEY_OWNER_NOTIFICATION, value).apply()
+
+    var showAlertMessageEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_MESSAGE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_MESSAGE, value).apply()
+
+    var appLockEnabled: Boolean
+        get() = prefs.getBoolean(KEY_APP_LOCK, false)
+        set(value) = prefs.edit().putBoolean(KEY_APP_LOCK, value).apply()
 
     fun incrementFailedAttempts(): Int {
         val next = currentFailedAttempts + 1
@@ -73,7 +86,13 @@ class PrefsManager(context: Context) {
         private const val KEY_SMTP_USER = "smtp_user"
         private const val KEY_SMTP_PASS = "smtp_pass"
         private const val KEY_MONITORING_ENABLED = "monitoring_enabled"
+        private const val KEY_CAPTURE_PHOTOS = "capture_photos_enabled"
+        private const val KEY_PHOTO_COUNT = "photo_count"
+        private const val KEY_ALARM_ENABLED = "alarm_enabled"
+        private const val KEY_OWNER_NOTIFICATION = "owner_notification_enabled"
+        private const val KEY_SHOW_MESSAGE = "show_alert_message_enabled"
+        private const val KEY_APP_LOCK = "app_lock_enabled"
 
-        const val DEFAULT_THRESHOLD = 2 // no 2º erro já dispara, como você pediu no exemplo
+        const val DEFAULT_THRESHOLD = 2
     }
 }

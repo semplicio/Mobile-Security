@@ -14,57 +14,46 @@ import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 
-/**
- * Envia o alerta de invasão por e-mail, com a foto do intruso anexada e o
- * link de localização no corpo da mensagem.
- *
- * IMPORTANTE: deve ser chamado sempre em thread de background (o
- * SecurityMonitorService já faz isso). Nunca chamar na main thread.
- *
- * Para Gmail: o usuário precisa gerar uma "senha de app" nas configurações
- * de segurança da conta Google (senha normal não funciona com SMTP direto).
- */
 class EmailSender(private val prefs: PrefsManager) {
 
-    fun sendIntrusionAlert(photoFile: File?, mapsLink: String?): Boolean {
-        if (!prefs.isEmailConfigured()) {
-            Log.w(TAG, "E-mail não configurado — pulando envio")
+    fun sendIntrusionAlert(photoFiles: List<File>, mapsLink: String?): Boolean {
+        if (!prefs.ownerNotificationEnabled || !prefs.isEmailConfigured()) {
+            Log.w(TAG, "Envio ao proprietário desativado ou e-mail não configurado")
             return false
         }
 
         return try {
             val session = buildSession()
-
             val message = MimeMessage(session).apply {
                 setFrom(InternetAddress(prefs.smtpUser))
                 setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
-                subject = "⚠️ AutomBot Security: tentativa de acesso não autorizado"
+                subject = "AutomBot Security: tentativa de acesso não autorizado"
             }
 
             val bodyText = buildString {
-                append("Foram detectadas tentativas incorretas de desbloqueio no seu aparelho.\n\n")
+                append("O AutomBot Security detectou tentativas incorretas de desbloqueio.\n\n")
+                append("Tentativas registradas: ${prefs.currentFailedAttempts}\n")
+                append("Evidências capturadas: ${photoFiles.count { it.exists() }} foto(s)\n\n")
                 if (mapsLink != null) {
-                    append("Localização aproximada no momento do alerta:\n$mapsLink\n\n")
+                    append("Localização aproximada:\n$mapsLink\n\n")
                 } else {
-                    append("Não foi possível obter a localização no momento.\n\n")
+                    append("Não foi possível obter a localização neste momento.\n\n")
                 }
-                append("Este é um alerta automático do AutomBot Security.")
+                append("Alerta automático do AutomBot Security.")
             }
 
-            val textPart = MimeBodyPart().apply { setText(bodyText, "utf-8") }
+            val multipart = MimeMultipart().apply {
+                addBodyPart(MimeBodyPart().apply { setText(bodyText, "utf-8") })
+            }
 
-            val multipart = MimeMultipart().apply { addBodyPart(textPart) }
-
-            if (photoFile != null && photoFile.exists()) {
-                val imagePart = MimeBodyPart().apply {
+            photoFiles.filter { it.exists() }.forEach { photoFile ->
+                multipart.addBodyPart(MimeBodyPart().apply {
                     dataHandler = DataHandler(FileDataSource(photoFile))
                     fileName = photoFile.name
-                }
-                multipart.addBodyPart(imagePart)
+                })
             }
 
             message.setContent(multipart)
-
             Transport.send(message)
             Log.i(TAG, "E-mail de alerta enviado com sucesso")
             true
@@ -74,12 +63,26 @@ class EmailSender(private val prefs: PrefsManager) {
         }
     }
 
+    fun sendIntrusionAlert(photoFile: File?, mapsLink: String?): Boolean =
+        sendIntrusionAlert(photoFile?.let { listOf(it) } ?: emptyList(), mapsLink)
+
     private fun buildSession(): Session {
+        val ssl = prefs.smtpPort == 465
         val props = Properties().apply {
             put("mail.smtp.auth", "true")
-            put("mail.smtp.starttls.enable", "true")
             put("mail.smtp.host", prefs.smtpHost)
             put("mail.smtp.port", prefs.smtpPort.toString())
+            if (ssl) {
+                put("mail.smtp.ssl.enable", "true")
+                put("mail.smtp.socketFactory.port", prefs.smtpPort.toString())
+                put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory")
+                put("mail.smtp.starttls.enable", "false")
+            } else {
+                put("mail.smtp.starttls.enable", "true")
+            }
+            put("mail.smtp.connectiontimeout", "15000")
+            put("mail.smtp.timeout", "20000")
+            put("mail.smtp.writetimeout", "20000")
         }
 
         return Session.getInstance(props, object : javax.mail.Authenticator() {
