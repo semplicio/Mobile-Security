@@ -288,16 +288,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Remetente gerenciado pelo AutomBot Security. Nenhuma configuração SMTP é necessária neste aparelho."
+                android:text="O envio padrão usa Google OAuth 2.0 e Gmail API somente com permissão para enviar mensagens. O AutomBot Security não solicita permissão para ler seus e-mails."
                 android:textColor="#9DB1C8"
                 android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvGoogleAccountStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Conta Google não conectada"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnConnectGoogle"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="12dp"
+                android:text="Conectar conta Google"
+                android:textAllCaps="false"
+                app:cornerRadius="16dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTestAlert"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="10dp"
                 android:text="Testar captura e alerta"
                 android:textAllCaps="false"
                 app:cornerRadius="16dp" />
