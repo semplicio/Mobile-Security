@@ -82,16 +82,16 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     private fun wireLauncherInteractions() {
         binding.searchBar.setOnClickListener {
             showInteraction(
-                "Pesquisa local",
-                "A pesquisa permanece dentro desta tela enquanto o modo protegido estiver ativo."
+                "Pesquisar apps",
+                "A pesquisa permanece dentro da interface protegida do AutomBot."
             )
         }
 
         binding.tilePhone.setOnClickListener { showProtectedShortcut("Telefone") }
         binding.tileWeb.setOnClickListener {
             showInteraction(
-                "AutomBot Web",
-                "autombot.com.br • o acesso externo fica disponível após o período protegido."
+                "Web",
+                "O acesso externo fica disponível após o período protegido."
             )
         }
         binding.tilePhotos.setOnClickListener { showProtectedShortcut("Fotos") }
@@ -100,19 +100,31 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         binding.tileNotes.setOnClickListener { showProtectedShortcut("Notas") }
         binding.tileWeather.setOnClickListener { showProtectedShortcut("Clima") }
         binding.tileFiles.setOnClickListener { showProtectedShortcut("Arquivos") }
+        binding.tileSettings.setOnClickListener {
+            showInteraction(
+                "Configurar",
+                "As configurações do dispositivo ficam disponíveis ao final do período protegido."
+            )
+        }
+        binding.tileHelp.setOnClickListener {
+            showInteraction(
+                "Proteção AutomBot",
+                "Esta é uma interface temporária do AutomBot para proteção do dispositivo."
+            )
+        }
 
         binding.dockPhone.setOnClickListener { showProtectedShortcut("Telefone") }
         binding.dockWeb.setOnClickListener {
             showInteraction(
-                "AutomBot Web",
-                "Portal AutomBot preparado. O acesso externo será liberado ao final do período protegido."
+                "Web",
+                "O acesso externo fica disponível após o período protegido."
             )
         }
         binding.dockMessages.setOnClickListener { showProtectedShortcut("Mensagens") }
         binding.dockHelp.setOnClickListener {
             showInteraction(
                 "Proteção AutomBot",
-                "Esta interface permanece ativa temporariamente para proteger o dispositivo."
+                "Esta é uma interface temporária do AutomBot para proteção do dispositivo."
             )
         }
 
