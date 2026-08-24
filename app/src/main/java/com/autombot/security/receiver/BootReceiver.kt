@@ -5,15 +5,19 @@ import android.content.Context
 import android.content.Intent
 import com.autombot.security.service.SecurityMonitorService
 import com.autombot.security.util.PrefsManager
+import com.autombot.security.worker.PendingIncidentScheduler
 
 /**
  * Reinicia o serviço de monitoramento após o aparelho ser ligado, caso o
  * usuário já tenha ativado a proteção antes de desligar/reiniciar.
+ * Também restaura qualquer incidente que ainda aguarde conexão para envio.
  */
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+
+        PendingIncidentScheduler.enqueueAllPending(context)
 
         val prefs = PrefsManager(context)
         if (prefs.monitoringEnabled) {
