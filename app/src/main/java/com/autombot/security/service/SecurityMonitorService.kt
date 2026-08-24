@@ -19,7 +19,9 @@ import com.autombot.security.util.IncidentHistoryLogger
 import com.autombot.security.util.IncidentInfoCollector
 import com.autombot.security.util.IncidentDetails
 import com.autombot.security.util.LocationHelper
+import com.autombot.security.util.PendingIncidentStore
 import com.autombot.security.util.PrefsManager
+import com.autombot.security.worker.PendingIncidentScheduler
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -47,6 +49,10 @@ class SecurityMonitorService : LifecycleService() {
         cameraHelper = CameraCaptureHelper(this)
         locationHelper = LocationHelper(this)
         createNotificationChannel()
+
+        // Recupera qualquer incidente que tenha permanecido pendente após
+        // encerramento do processo ou reinicialização inesperada.
+        PendingIncidentScheduler.enqueueAllPending(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -140,6 +146,30 @@ class SecurityMonitorService : LifecycleService() {
                 return@getCurrentLocation
             }
 
+            // Produção: grava o incidente antes de qualquer tentativa de rede.
+            // Assim fotos, vídeos, áudio, localização e dados do evento continuam
+            // disponíveis mesmo se o aparelho estiver sem chip, sem Wi-Fi ou se
+            // o processo for encerrado durante a tentativa de envio.
+            val pendingId = if (!isTest) {
+                runCatching {
+                    val pending = PendingIncidentStore(this).create(
+                        evidence = evidence,
+                        mapsLink = mapsLink,
+                        incident = incident
+                    )
+                    PendingIncidentScheduler.enqueue(this, pending.id)
+                    pending.id
+                }.getOrElse { error ->
+                    showStatusNotification(
+                        "Falha ao guardar incidente",
+                        "Não foi possível criar a fila local de reenvio: ${error.message.orEmpty().take(120)}"
+                    )
+                    null
+                }
+            } else {
+                null
+            }
+
             if (prefs.alertTransport == PrefsManager.TRANSPORT_GMAIL && prefs.isGmailConfigured()) {
                 GmailApiSender(this, prefs).sendIntrusionAlert(
                     evidence = evidence,
@@ -148,6 +178,8 @@ class SecurityMonitorService : LifecycleService() {
                     isTest = isTest
                 ) { success, detail ->
                     if (success) {
+                        pendingId?.let { PendingIncidentStore(this).markDelivered(it) }
+
                         if (isTest) {
                             showStatusNotification(
                                 "Teste concluído",
@@ -160,16 +192,24 @@ class SecurityMonitorService : LifecycleService() {
                             )
                         }
                     } else {
-                        trySmtpFallback(evidence, mapsLink, incident, isTest, detail)
+                        trySmtpFallback(
+                            evidence = evidence,
+                            mapsLink = mapsLink,
+                            incident = incident,
+                            isTest = isTest,
+                            gmailFailureDetail = detail,
+                            pendingId = pendingId
+                        )
                     }
                 }
             } else {
                 trySmtpFallback(
-                    evidence,
-                    mapsLink,
-                    incident,
-                    isTest,
-                    "Conta Google ainda não conectada"
+                    evidence = evidence,
+                    mapsLink = mapsLink,
+                    incident = incident,
+                    isTest = isTest,
+                    gmailFailureDetail = "Conta Google ainda não conectada",
+                    pendingId = pendingId
                 )
             }
         }
@@ -180,7 +220,8 @@ class SecurityMonitorService : LifecycleService() {
         mapsLink: String?,
         incident: IncidentDetails,
         isTest: Boolean,
-        gmailFailureDetail: String
+        gmailFailureDetail: String,
+        pendingId: String?
     ) {
         emailExecutor.execute {
             val smtpSuccess = EmailSender(prefs).sendIntrusionAlert(
@@ -189,6 +230,18 @@ class SecurityMonitorService : LifecycleService() {
                 incident = incident,
                 isTest = isTest
             )
+
+            if (smtpSuccess) {
+                pendingId?.let { PendingIncidentStore(this).markDelivered(it) }
+            } else if (pendingId != null) {
+                PendingIncidentStore(this).updateLastError(
+                    pendingId,
+                    "$gmailFailureDetail; fallback SMTP indisponível"
+                )
+                // O trabalho já está persistido. Reforçamos o agendamento para
+                // o caso de o processo ter sido recriado entre as etapas.
+                PendingIncidentScheduler.enqueue(this, pendingId, immediate = true)
+            }
 
             if (isTest) {
                 showStatusNotification(
@@ -204,10 +257,15 @@ class SecurityMonitorService : LifecycleService() {
                     "Alerta enviado via fallback",
                     "Evento enviado ao proprietário. Arquivos anexados: ${evidence.size}."
                 )
+            } else if (pendingId != null) {
+                showStatusNotification(
+                    "Alerta guardado para reenvio",
+                    "Sem conexão ou transporte disponível. O incidente foi salvo e será reenviado automaticamente quando houver internet."
+                )
             } else {
                 showStatusNotification(
                     "Alerta não enviado",
-                    "$gmailFailureDetail. Reconecte a conta Google assim que possível."
+                    "$gmailFailureDetail. Não foi possível criar uma fila local para este evento."
                 )
             }
         }
