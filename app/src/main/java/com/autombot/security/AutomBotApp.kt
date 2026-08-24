@@ -1,11 +1,15 @@
 package com.autombot.security
 
 import android.app.Application
+import com.autombot.security.worker.PendingIncidentScheduler
 
 class AutomBotApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Ponto central para inicializações futuras (ex.: WorkManager periódico,
-        // sincronização com o AutomBot Core, etc.)
+
+        // Defesa adicional: se existir algum incidente salvo localmente e o
+        // WorkManager tiver sido recriado pelo sistema, garantimos que cada item
+        // volte para a fila de entrega assim que o processo do app iniciar.
+        PendingIncidentScheduler.enqueueAllPending(this)
     }
 }
