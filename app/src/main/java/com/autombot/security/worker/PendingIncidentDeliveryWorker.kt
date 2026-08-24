@@ -130,7 +130,12 @@ class PendingIncidentDeliveryWorker(
 
 object PendingIncidentScheduler {
     private const val UNIQUE_PREFIX = "autombot_pending_incident_"
-    private const val INITIAL_SAFETY_DELAY_SECONDS = 30L
+
+    // A tentativa imediata continua sendo feita pelo serviço. O worker aguarda
+    // um pouco antes da primeira execução para evitar dois envios simultâneos
+    // quando a rede está lenta. Se o processo morrer, a cópia persistente ainda
+    // será entregue após esse pequeno intervalo.
+    private const val INITIAL_SAFETY_DELAY_SECONDS = 90L
 
     fun enqueue(
         context: Context,
