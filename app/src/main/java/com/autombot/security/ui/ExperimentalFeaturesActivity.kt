@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.autombot.security.databinding.ActivityExperimentalFeaturesBinding
+import com.autombot.security.util.AppLockSession
 import com.autombot.security.util.ExperimentalPolicyManager
 import com.autombot.security.util.PrefsManager
 
@@ -21,7 +22,10 @@ class ExperimentalFeaturesActivity : AppCompatActivity() {
         prefs = PrefsManager(this)
         policy = ExperimentalPolicyManager(this)
 
-        binding.btnBack.setOnClickListener { finish() }
+        binding.btnBack.setOnClickListener {
+            AppLockSession.suppressNextBackgroundLock()
+            finish()
+        }
 
         binding.switchStatusBar.isChecked = prefs.experimentalStatusBarBlockEnabled
         binding.switchPowerMenu.isChecked = prefs.experimentalPowerProtectionEnabled
@@ -51,9 +55,22 @@ class ExperimentalFeaturesActivity : AppCompatActivity() {
         }
 
         binding.switchCaptureOnSystemUi.setOnCheckedChangeListener { _, _ ->
-            // Não persistimos esta opção: o Android não fornece evento oficial
-            // para abertura do menu de energia/painel rápido em aparelhos comuns.
             binding.switchCaptureOnSystemUi.isChecked = false
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::prefs.isInitialized && prefs.appLockEnabled && !AppLockSession.unlocked) {
+            // Volta para a tela anterior, que exibirá a autenticação local.
+            finish()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations && !AppLockSession.consumeBackgroundSuppression()) {
+            AppLockSession.lock()
         }
     }
 
