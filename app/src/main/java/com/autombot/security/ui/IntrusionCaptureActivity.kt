@@ -15,7 +15,6 @@ import androidx.camera.core.CameraSelector
 import androidx.core.content.ContextCompat
 import com.autombot.security.databinding.ActivityIntrusionCaptureBinding
 import com.autombot.security.service.SecurityMonitorService
-import com.autombot.security.util.AudioRecorderHelper
 import com.autombot.security.util.CameraCaptureHelper
 import com.autombot.security.util.PrefsManager
 import com.autombot.security.util.VideoCaptureHelper
@@ -25,7 +24,6 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     private lateinit var binding: ActivityIntrusionCaptureBinding
     private lateinit var prefs: PrefsManager
     private lateinit var cameraHelper: CameraCaptureHelper
-    private lateinit var audioHelper: AudioRecorderHelper
     private lateinit var videoHelper: VideoCaptureHelper
 
     private var started = false
@@ -33,10 +31,6 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     private var managedLockTaskStarted = false
     private var evidenceProcessed = false
     private var protectionTimer: CountDownTimer? = null
-
-    private var photosCompleted = false
-    private var audioCompleted = false
-    private var videosStarted = false
 
     private val evidencePaths = mutableListOf<String>()
 
@@ -62,7 +56,6 @@ class IntrusionCaptureActivity : AppCompatActivity() {
 
         prefs = PrefsManager(this)
         cameraHelper = CameraCaptureHelper(this)
-        audioHelper = AudioRecorderHelper(this)
         videoHelper = VideoCaptureHelper(this)
 
         binding.tvRecordingIndicator.text = "Processamento de segurança ativo"
@@ -78,7 +71,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         super.onResume()
         if (started) return
         started = true
-        startFastEvidenceCapture()
+        captureFrontPhotos()
     }
 
     override fun onDestroy() {
@@ -87,40 +80,9 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun startFastEvidenceCapture() {
-        startAudioCaptureInParallel()
-        captureFrontPhotos()
-    }
-
-    /**
-     * O áudio começa junto com as fotos. Os vídeos só começam quando fotos e
-     * áudio terminarem, evitando conflito de recursos e reduzindo o tempo total.
-     */
-    private fun startAudioCaptureInParallel() {
-        if (!prefs.recordAudioEnabled) {
-            audioCompleted = true
-            maybeStartVideos()
-            return
-        }
-
-        audioHelper.recordFor(
-            durationMs = AUDIO_DURATION_MS,
-            onSuccess = { file ->
-                evidencePaths += file.absolutePath
-                audioCompleted = true
-                maybeStartVideos()
-            },
-            onError = {
-                audioCompleted = true
-                maybeStartVideos()
-            }
-        )
-    }
-
     private fun captureFrontPhotos() {
         if (!prefs.capturePhotosEnabled) {
-            photosCompleted = true
-            maybeStartVideos()
+            recordFrontVideo()
             return
         }
 
@@ -145,20 +107,12 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             lensFacing = CameraSelector.LENS_FACING_BACK,
             onComplete = { files ->
                 evidencePaths += files.map { it.absolutePath }
-                photosCompleted = true
-                maybeStartVideos()
+                recordFrontVideo()
             },
             onError = {
-                photosCompleted = true
-                maybeStartVideos()
+                recordFrontVideo()
             }
         )
-    }
-
-    private fun maybeStartVideos() {
-        if (!photosCompleted || !audioCompleted || videosStarted) return
-        videosStarted = true
-        recordFrontVideo()
     }
 
     private fun recordFrontVideo() {
@@ -170,7 +124,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         videoHelper.recordFor(
             lifecycleOwner = this,
             durationMs = VIDEO_DURATION_MS,
-            withAudio = false,
+            withAudio = true,
             lensFacing = CameraSelector.LENS_FACING_FRONT,
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
@@ -186,7 +140,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         videoHelper.recordFor(
             lifecycleOwner = this,
             durationMs = VIDEO_DURATION_MS,
-            withAudio = false,
+            withAudio = true,
             lensFacing = CameraSelector.LENS_FACING_BACK,
             onSuccess = { file ->
                 evidencePaths += file.absolutePath
@@ -356,7 +310,6 @@ class IntrusionCaptureActivity : AppCompatActivity() {
 
     companion object {
         private const val PROTECTION_DURATION_MS = 20_000L
-        private const val AUDIO_DURATION_MS = 3_000L
-        private const val VIDEO_DURATION_MS = 2_500L
+        private const val VIDEO_DURATION_MS = 3_000L
     }
 }
