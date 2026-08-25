@@ -94,21 +94,6 @@ class VideoCaptureHelper(private val context: Context) {
         }, ContextCompat.getMainExecutor(context))
     }
 
-    fun recordFiveSeconds(
-        lifecycleOwner: LifecycleOwner,
-        withAudio: Boolean,
-        lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
-        onSuccess: (File) -> Unit,
-        onError: (Throwable) -> Unit
-    ) = recordFor(
-        lifecycleOwner = lifecycleOwner,
-        durationMs = 5_000L,
-        withAudio = withAudio,
-        lensFacing = lensFacing,
-        onSuccess = onSuccess,
-        onError = onError
-    )
-
     private fun timestamp(): String =
         SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
 }
