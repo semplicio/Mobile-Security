@@ -87,7 +87,9 @@ class PrefsManager(context: Context) {
     // oferece gravação de áudio separada; o áudio é incorporado ao vídeo.
     var recordAudioEnabled: Boolean
         get() = false
-        set(_) = prefs.edit().remove(KEY_RECORD_AUDIO).apply()
+        set(value) {
+            prefs.edit().remove(KEY_RECORD_AUDIO).apply()
+        }
 
     var recordVideoEnabled: Boolean
         get() = prefs.getBoolean(KEY_RECORD_VIDEO, false)
@@ -165,7 +167,10 @@ class PrefsManager(context: Context) {
             APP_LOCK_KEY_BITS
         )
         return try {
-            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            // PBKDF2WithHmacSHA1 está disponível em todas as versões Android
+            // suportadas pelo app (minSdk 24). O salt é aleatório e cada senha
+            // passa por múltiplas iterações antes de ser armazenada.
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
                 .generateSecret(spec)
                 .encoded
         } finally {
