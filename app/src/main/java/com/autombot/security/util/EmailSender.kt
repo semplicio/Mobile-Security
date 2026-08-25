@@ -23,10 +23,15 @@ class EmailSender(private val prefs: PrefsManager) {
         incident: IncidentDetails? = null,
         isTest: Boolean = false
     ): Boolean {
-        if (prefs.destinationEmail.isBlank()) {
-            Log.w(TAG, "E-mail do proprietário não configurado")
-            return false
-        }
+        val destination = prefs.googleAccountEmail.takeIf { it.contains("@") }
+            ?: prefs.destinationEmail.takeIf { it.contains("@") }
+            ?: run {
+                Log.w(TAG, "E-mail do proprietário não configurado")
+                return false
+            }
+
+        prefs.destinationEmail = destination
+
         if (BuildConfig.SMTP_USER.isBlank() || BuildConfig.SMTP_PASSWORD.isBlank()) {
             Log.e(TAG, "Credenciais administrativas SMTP não foram fornecidas no build")
             return false
@@ -35,13 +40,12 @@ class EmailSender(private val prefs: PrefsManager) {
         return try {
             val validEvidence = evidence.filter { it.exists() && it.isFile }
             val photos = validEvidence.count { it.extension.equals("jpg", true) || it.extension.equals("jpeg", true) }
-            val audios = validEvidence.count { it.extension.equals("m4a", true) }
             val videos = validEvidence.count { it.extension.equals("mp4", true) }
 
             val session = buildSession()
             val message = MimeMessage(session).apply {
                 setFrom(InternetAddress(BuildConfig.SMTP_USER))
-                setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
+                setRecipients(Message.RecipientType.TO, InternetAddress.parse(destination))
                 subject = if (isTest) {
                     "AutomBot Security: teste de alerta"
                 } else {
@@ -83,8 +87,8 @@ class EmailSender(private val prefs: PrefsManager) {
                     append("Captura de mídia não realizada automaticamente neste evento.\n")
                 } else {
                     append("Fotos anexadas: $photos\n")
-                    append("Áudios anexados: $audios\n")
                     append("Vídeos anexados: $videos\n")
+                    append("O áudio, quando autorizado, é incorporado aos vídeos.\n")
                 }
 
                 append("\nMensagem automática do AutomBot Security.")
@@ -105,7 +109,7 @@ class EmailSender(private val prefs: PrefsManager) {
 
             message.setContent(multipart)
             Transport.send(message)
-            Log.i(TAG, "E-mail enviado com sucesso para ${prefs.destinationEmail}")
+            Log.i(TAG, "E-mail enviado com sucesso para $destination")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Falha ao enviar e-mail", e)
