@@ -108,25 +108,18 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchRecordAudio"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="Gravar áudio por 5 segundos"
-                android:textColor="#FFFFFF" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switchRecordVideo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Gravar vídeo frontal por 5 segundos"
+                android:layout_marginTop="12dp"
+                android:text="Gravar vídeos de 3 segundos com áudio"
                 android:textColor="#FFFFFF" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Áudio e vídeo são gravados somente enquanto a tela de resposta do AutomBot Security está visível."
+                android:text="Quando habilitado, o AutomBot registra vídeo frontal e traseiro por 3 segundos. O áudio é incorporado ao próprio vídeo, sem gravação de áudio separada."
                 android:textColor="#9DB1C8"
                 android:textSize="12sp" />
 
@@ -185,19 +178,13 @@
                 android:text="Enviar alerta ao proprietário"
                 android:textColor="#FFFFFF" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="@string/label_dest_email"
-                app:boxBackgroundMode="outline">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDestEmail"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textEmailAddress"
-                    android:textColor="#FFFFFF" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:layout_marginTop="4dp"
+                android:text="O alerta será enviado automaticamente para a Conta Google conectada em Transporte de alertas. Não é necessário informar o e-mail novamente."
+                android:textColor="#9DB1C8"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -221,14 +208,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Exigir bloqueio para abrir configurações"
+                android:text="Exigir senha para abrir o AutomBot Security"
                 android:textColor="#FFFFFF" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="A opção prepara o app para autenticação local; a validação por biometria/PIN será vinculada na próxima etapa."
+                android:text="Ao ativar, você criará uma senha local própria do AutomBot, independente da senha da tela de bloqueio do Android."
                 android:textColor="#9DB1C8"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -288,7 +275,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="O envio padrão usa Google OAuth 2.0 e Gmail API somente com permissão para enviar mensagens. O AutomBot Security não solicita permissão para ler seus e-mails."
+                android:text="O envio padrão usa Google OAuth 2.0 e Gmail API somente com permissão para enviar mensagens. O AutomBot Security não solicita permissão para ler seus e-mails. A conta conectada também será usada como destinatária dos alertas do proprietário."
                 android:textColor="#9DB1C8"
                 android:textSize="13sp" />
 
