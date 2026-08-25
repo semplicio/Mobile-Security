@@ -50,8 +50,6 @@ class SecurityMonitorService : LifecycleService() {
         locationHelper = LocationHelper(this)
         createNotificationChannel()
 
-        // Recupera qualquer incidente que tenha permanecido pendente após
-        // encerramento do processo ou reinicialização inesperada.
         PendingIncidentScheduler.enqueueAllPending(this)
     }
 
@@ -74,10 +72,6 @@ class SecurityMonitorService : LifecycleService() {
         if (prefs.alarmEnabled) alarmHelper.playAlarm()
         if (prefs.showAlertMessageEnabled) showSecurityAlertNotification()
 
-        // Não envia o e-mail imediatamente. Primeiro dá tempo para a Activity
-        // visível registrar as mídias habilitadas pelo proprietário. Se o Android
-        // impedir a abertura da tela ou a captura falhar, o fallback envia o
-        // alerta somente com localização e dados técnicos.
         handler.removeCallbacks(productionFallback)
         handler.postDelayed(productionFallback, PRODUCTION_CAPTURE_TIMEOUT_MS)
     }
@@ -146,10 +140,6 @@ class SecurityMonitorService : LifecycleService() {
                 return@getCurrentLocation
             }
 
-            // Produção: grava o incidente antes de qualquer tentativa de rede.
-            // Assim fotos, vídeos, áudio, localização e dados do evento continuam
-            // disponíveis mesmo se o aparelho estiver sem chip, sem Wi-Fi ou se
-            // o processo for encerrado durante a tentativa de envio.
             val pendingId = if (!isTest) {
                 runCatching {
                     val pending = PendingIncidentStore(this).create(
@@ -238,8 +228,6 @@ class SecurityMonitorService : LifecycleService() {
                     pendingId,
                     "$gmailFailureDetail; fallback SMTP indisponível"
                 )
-                // O trabalho já está persistido. Reforçamos o agendamento para
-                // o caso de o processo ter sido recriado entre as etapas.
                 PendingIncidentScheduler.enqueue(this, pendingId, immediate = true)
             }
 
@@ -284,7 +272,9 @@ class SecurityMonitorService : LifecycleService() {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setSilent(true)
+                .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build()
         )
@@ -301,6 +291,7 @@ class SecurityMonitorService : LifecycleService() {
             .setSmallIcon(R.drawable.ic_shield)
             .setContentIntent(openAppIntent)
             .setOngoing(true)
+            .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
@@ -308,15 +299,29 @@ class SecurityMonitorService : LifecycleService() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
+
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
                     getString(R.string.notification_channel_name),
                     NotificationManager.IMPORTANCE_LOW
-                )
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
             )
+
             manager.createNotificationChannel(
-                NotificationChannel(ALERT_CHANNEL_ID, "Alertas de segurança", NotificationManager.IMPORTANCE_HIGH)
+                NotificationChannel(
+                    ALERT_CHANNEL_ID,
+                    "Alertas de segurança",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
             )
         }
     }
@@ -338,9 +343,9 @@ class SecurityMonitorService : LifecycleService() {
         const val EXTRA_EVIDENCE_PATHS = "evidence_paths"
 
         private const val CHANNEL_ID = "autombot_security_monitoring"
-        private const val ALERT_CHANNEL_ID = "autombot_security_alerts"
+        private const val ALERT_CHANNEL_ID = "autombot_security_alerts_silent_v2"
         private const val NOTIFICATION_ID = 1001
         private const val SECURITY_ALERT_NOTIFICATION_ID = 1002
-        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 45_000L
+        private const val PRODUCTION_CAPTURE_TIMEOUT_MS = 25_000L
     }
 }
