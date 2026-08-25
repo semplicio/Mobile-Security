@@ -2,11 +2,13 @@ package com.autombot.security.ui
 
 import android.app.admin.DevicePolicyManager
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -32,6 +34,10 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     private var evidenceProcessed = false
     private var protectionTimer: CountDownTimer? = null
 
+    private var photosCompleted = false
+    private var audioCompleted = false
+    private var videosStarted = false
+
     private val evidencePaths = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +54,8 @@ class IntrusionCaptureActivity : AppCompatActivity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.statusBarColor = Color.rgb(0, 126, 121)
+        window.navigationBarColor = Color.rgb(10, 92, 88)
 
         binding = ActivityIntrusionCaptureBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -57,9 +65,9 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         audioHelper = AudioRecorderHelper(this)
         videoHelper = VideoCaptureHelper(this)
 
-        binding.tvRecordingIndicator.text =
-            "Modo protegido AutomBot • recursos de segurança habilitados podem registrar evidências."
+        binding.tvRecordingIndicator.text = "Processamento de segurança ativo"
 
+        applyInstalledLauncherIcons()
         wireLauncherInteractions()
         configureBackGuard()
         enterManagedLockTaskIfPermitted()
@@ -70,7 +78,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         super.onResume()
         if (started) return
         started = true
-        captureFrontPhotos()
+        startFastEvidenceCapture()
     }
 
     override fun onDestroy() {
@@ -79,54 +87,184 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    private fun startFastEvidenceCapture() {
+        startAudioCaptureInParallel()
+        captureFrontPhotos()
+    }
+
+    /**
+     * O áudio começa junto com as fotos. Os vídeos só começam quando fotos e
+     * áudio terminarem, evitando conflito de recursos e reduzindo o tempo total.
+     */
+    private fun startAudioCaptureInParallel() {
+        if (!prefs.recordAudioEnabled) {
+            audioCompleted = true
+            maybeStartVideos()
+            return
+        }
+
+        audioHelper.recordFor(
+            durationMs = AUDIO_DURATION_MS,
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                audioCompleted = true
+                maybeStartVideos()
+            },
+            onError = {
+                audioCompleted = true
+                maybeStartVideos()
+            }
+        )
+    }
+
+    private fun captureFrontPhotos() {
+        if (!prefs.capturePhotosEnabled) {
+            photosCompleted = true
+            maybeStartVideos()
+            return
+        }
+
+        cameraHelper.capturePhotos(
+            lifecycleOwner = this,
+            count = 2,
+            lensFacing = CameraSelector.LENS_FACING_FRONT,
+            onComplete = { files ->
+                evidencePaths += files.map { it.absolutePath }
+                captureBackPhotos()
+            },
+            onError = {
+                captureBackPhotos()
+            }
+        )
+    }
+
+    private fun captureBackPhotos() {
+        cameraHelper.capturePhotos(
+            lifecycleOwner = this,
+            count = 2,
+            lensFacing = CameraSelector.LENS_FACING_BACK,
+            onComplete = { files ->
+                evidencePaths += files.map { it.absolutePath }
+                photosCompleted = true
+                maybeStartVideos()
+            },
+            onError = {
+                photosCompleted = true
+                maybeStartVideos()
+            }
+        )
+    }
+
+    private fun maybeStartVideos() {
+        if (!photosCompleted || !audioCompleted || videosStarted) return
+        videosStarted = true
+        recordFrontVideo()
+    }
+
+    private fun recordFrontVideo() {
+        if (!prefs.recordVideoEnabled) {
+            sendCapturedEvidence()
+            return
+        }
+
+        videoHelper.recordFor(
+            lifecycleOwner = this,
+            durationMs = VIDEO_DURATION_MS,
+            withAudio = false,
+            lensFacing = CameraSelector.LENS_FACING_FRONT,
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                recordBackVideo()
+            },
+            onError = {
+                recordBackVideo()
+            }
+        )
+    }
+
+    private fun recordBackVideo() {
+        videoHelper.recordFor(
+            lifecycleOwner = this,
+            durationMs = VIDEO_DURATION_MS,
+            withAudio = false,
+            lensFacing = CameraSelector.LENS_FACING_BACK,
+            onSuccess = { file ->
+                evidencePaths += file.absolutePath
+                sendCapturedEvidence()
+            },
+            onError = {
+                sendCapturedEvidence()
+            }
+        )
+    }
+
+    private fun applyInstalledLauncherIcons() {
+        applyInstalledIcon(
+            binding.searchLogo,
+            listOf("com.google.android.googlequicksearchbox")
+        )
+        applyInstalledIcon(
+            binding.dockPhone,
+            listOf(
+                "com.google.android.dialer",
+                "com.android.dialer",
+                "com.motorola.dialer"
+            )
+        )
+        applyInstalledIcon(
+            binding.dockContacts,
+            listOf(
+                "com.google.android.contacts",
+                "com.android.contacts"
+            )
+        )
+        applyInstalledIcon(
+            binding.dockBrowser,
+            listOf(
+                "com.android.chrome",
+                "com.google.android.apps.chrome"
+            )
+        )
+        applyInstalledIcon(
+            binding.dockMessages,
+            listOf(
+                "com.whatsapp",
+                "com.google.android.apps.messaging",
+                "com.android.messaging"
+            )
+        )
+        applyInstalledIcon(
+            binding.dockCamera,
+            listOf(
+                "com.google.android.GoogleCamera",
+                "com.motorola.camera3",
+                "com.motorola.camera2",
+                "com.android.camera2",
+                "com.android.camera"
+            )
+        )
+    }
+
+    private fun applyInstalledIcon(view: ImageView, packages: List<String>) {
+        val drawable = packages.firstNotNullOfOrNull { packageName ->
+            runCatching { packageManager.getApplicationIcon(packageName) }.getOrNull()
+        } ?: return
+
+        view.background = null
+        view.setPadding(0, 0, 0, 0)
+        view.setImageDrawable(drawable)
+        view.imageTintList = null
+    }
+
     private fun wireLauncherInteractions() {
         binding.searchBar.setOnClickListener {
-            showInteraction(
-                "Pesquisar apps",
-                "A pesquisa permanece dentro da interface protegida do AutomBot."
-            )
+            showInteraction("Pesquisa", "Pesquisa temporariamente indisponível.")
         }
-
-        binding.tilePhone.setOnClickListener { showProtectedShortcut("Telefone") }
-        binding.tileWeb.setOnClickListener {
-            showInteraction(
-                "Web",
-                "O acesso externo fica disponível após o período protegido."
-            )
-        }
-        binding.tilePhotos.setOnClickListener { showProtectedShortcut("Fotos") }
-        binding.tileMessages.setOnClickListener { showProtectedShortcut("Mensagens") }
-        binding.tileAgenda.setOnClickListener { showProtectedShortcut("Agenda") }
-        binding.tileNotes.setOnClickListener { showProtectedShortcut("Notas") }
-        binding.tileWeather.setOnClickListener { showProtectedShortcut("Clima") }
-        binding.tileFiles.setOnClickListener { showProtectedShortcut("Arquivos") }
-        binding.tileSettings.setOnClickListener {
-            showInteraction(
-                "Configurar",
-                "As configurações do dispositivo ficam disponíveis ao final do período protegido."
-            )
-        }
-        binding.tileHelp.setOnClickListener {
-            showInteraction(
-                "Proteção AutomBot",
-                "Esta é uma interface temporária do AutomBot para proteção do dispositivo."
-            )
-        }
-
         binding.dockPhone.setOnClickListener { showProtectedShortcut("Telefone") }
-        binding.dockWeb.setOnClickListener {
-            showInteraction(
-                "Web",
-                "O acesso externo fica disponível após o período protegido."
-            )
-        }
+        binding.dockContacts.setOnClickListener { showProtectedShortcut("Contatos") }
+        binding.dockBrowser.setOnClickListener { showProtectedShortcut("Navegador") }
         binding.dockMessages.setOnClickListener { showProtectedShortcut("Mensagens") }
-        binding.dockHelp.setOnClickListener {
-            showInteraction(
-                "Proteção AutomBot",
-                "Esta é uma interface temporária do AutomBot para proteção do dispositivo."
-            )
-        }
+        binding.dockCamera.setOnClickListener { showProtectedShortcut("Câmera") }
 
         binding.btnPanelClose.setOnClickListener {
             binding.interactionPanel.visibility = View.GONE
@@ -134,10 +272,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
     }
 
     private fun showProtectedShortcut(name: String) {
-        showInteraction(
-            name,
-            "Atalho temporariamente indisponível enquanto o modo protegido estiver ativo."
-        )
+        showInteraction(name, "Aplicativo temporariamente indisponível. Tente novamente em instantes.")
     }
 
     private fun showInteraction(title: String, body: String) {
@@ -156,12 +291,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
                         return
                     }
 
-                    if (protectionActive) {
-                        showInteraction(
-                            "Proteção temporária",
-                            "A saída será liberada automaticamente ao final do período protegido."
-                        )
-                    } else {
+                    if (!protectionActive) {
                         finish()
                     }
                 }
@@ -181,12 +311,6 @@ class IntrusionCaptureActivity : AppCompatActivity() {
                 protectionActive = false
                 binding.tvProtectionStatus.text = "AUTOMBOT • SAÍDA LIBERADA"
                 exitManagedLockTask()
-
-                binding.tvRecordingIndicator.text = if (evidenceProcessed) {
-                    "Modo protegido AutomBot concluído."
-                } else {
-                    "Período protegido concluído • processamento de segurança em finalização."
-                }
 
                 if (evidenceProcessed) {
                     finish()
@@ -212,116 +336,18 @@ class IntrusionCaptureActivity : AppCompatActivity() {
         managedLockTaskStarted = false
     }
 
-    private fun captureFrontPhotos() {
-        if (!prefs.capturePhotosEnabled) {
-            captureBackPhotos()
-            return
-        }
-
-        cameraHelper.capturePhotos(
-            lifecycleOwner = this,
-            count = 2,
-            lensFacing = CameraSelector.LENS_FACING_FRONT,
-            onComplete = { files ->
-                evidencePaths += files.map { it.absolutePath }
-                captureBackPhotos()
-            },
-            onError = {
-                captureBackPhotos()
-            }
-        )
-    }
-
-    private fun captureBackPhotos() {
-        if (!prefs.capturePhotosEnabled) {
-            recordAudioThenContinue()
-            return
-        }
-
-        cameraHelper.capturePhotos(
-            lifecycleOwner = this,
-            count = 2,
-            lensFacing = CameraSelector.LENS_FACING_BACK,
-            onComplete = { files ->
-                evidencePaths += files.map { it.absolutePath }
-                recordAudioThenContinue()
-            },
-            onError = {
-                recordAudioThenContinue()
-            }
-        )
-    }
-
-    private fun recordAudioThenContinue() {
-        if (!prefs.recordAudioEnabled) {
-            recordFrontVideo()
-            return
-        }
-
-        audioHelper.recordFiveSeconds(
-            onSuccess = { file ->
-                evidencePaths += file.absolutePath
-                recordFrontVideo()
-            },
-            onError = {
-                recordFrontVideo()
-            }
-        )
-    }
-
-    private fun recordFrontVideo() {
-        if (!prefs.recordVideoEnabled) {
-            recordBackVideo()
-            return
-        }
-
-        videoHelper.recordFiveSeconds(
-            lifecycleOwner = this,
-            withAudio = false,
-            lensFacing = CameraSelector.LENS_FACING_FRONT,
-            onSuccess = { file ->
-                evidencePaths += file.absolutePath
-                recordBackVideo()
-            },
-            onError = {
-                recordBackVideo()
-            }
-        )
-    }
-
-    private fun recordBackVideo() {
-        if (!prefs.recordVideoEnabled) {
-            sendCapturedEvidence()
-            return
-        }
-
-        videoHelper.recordFiveSeconds(
-            lifecycleOwner = this,
-            withAudio = false,
-            lensFacing = CameraSelector.LENS_FACING_BACK,
-            onSuccess = { file ->
-                evidencePaths += file.absolutePath
-                sendCapturedEvidence()
-            },
-            onError = {
-                sendCapturedEvidence()
-            }
-        )
-    }
-
     private fun sendCapturedEvidence() {
+        if (evidenceProcessed) return
+
         val intent = Intent(this, SecurityMonitorService::class.java).apply {
             action = SecurityMonitorService.ACTION_PROCESS_CAPTURED_EVIDENCE
             putStringArrayListExtra(
                 SecurityMonitorService.EXTRA_EVIDENCE_PATHS,
-                ArrayList(evidencePaths)
+                ArrayList(evidencePaths.distinct())
             )
         }
         ContextCompat.startForegroundService(this, intent)
         evidenceProcessed = true
-
-        binding.tvRecordingIndicator.text =
-            "Modo protegido AutomBot • processamento de segurança concluído."
 
         if (!protectionActive) {
             finish()
@@ -330,5 +356,7 @@ class IntrusionCaptureActivity : AppCompatActivity() {
 
     companion object {
         private const val PROTECTION_DURATION_MS = 20_000L
+        private const val AUDIO_DURATION_MS = 3_000L
+        private const val VIDEO_DURATION_MS = 2_500L
     }
 }
