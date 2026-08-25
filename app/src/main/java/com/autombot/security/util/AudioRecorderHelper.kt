@@ -15,7 +15,8 @@ import java.util.Locale
 
 class AudioRecorderHelper(private val context: Context) {
 
-    fun recordFiveSeconds(
+    fun recordFor(
+        durationMs: Long,
         onSuccess: (File) -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -34,8 +35,8 @@ class AudioRecorderHelper(private val context: Context) {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(128000)
-                setAudioSamplingRate(44100)
+                setAudioEncodingBitRate(64000)
+                setAudioSamplingRate(22050)
                 setOutputFile(file.absolutePath)
                 prepare()
                 start()
@@ -43,20 +44,30 @@ class AudioRecorderHelper(private val context: Context) {
 
             Handler(Looper.getMainLooper()).postDelayed({
                 try {
-                    recorder.stop()
-                    recorder.release()
-                    if (file.exists() && file.length() > 0L) onSuccess(file)
-                    else onError(IllegalStateException("Arquivo de áudio vazio"))
+                    recorder?.stop()
+                    recorder?.release()
+                    recorder = null
+                    if (file.exists() && file.length() > 0L) {
+                        onSuccess(file)
+                    } else {
+                        onError(IllegalStateException("Arquivo de áudio vazio"))
+                    }
                 } catch (t: Throwable) {
                     runCatching { recorder?.release() }
+                    recorder = null
                     onError(t)
                 }
-            }, 5000L)
+            }, durationMs.coerceIn(1_500L, 10_000L))
         } catch (t: Throwable) {
             runCatching { recorder?.release() }
             onError(t)
         }
     }
+
+    fun recordFiveSeconds(
+        onSuccess: (File) -> Unit,
+        onError: (Throwable) -> Unit
+    ) = recordFor(5_000L, onSuccess, onError)
 
     @Suppress("DEPRECATION")
     private fun createRecorder(): MediaRecorder =
