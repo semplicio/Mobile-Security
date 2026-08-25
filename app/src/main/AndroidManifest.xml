@@ -20,6 +20,25 @@
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <queries>
+        <package android:name="com.google.android.googlequicksearchbox" />
+        <package android:name="com.google.android.dialer" />
+        <package android:name="com.android.dialer" />
+        <package android:name="com.motorola.dialer" />
+        <package android:name="com.google.android.contacts" />
+        <package android:name="com.android.contacts" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.apps.chrome" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.google.android.apps.messaging" />
+        <package android:name="com.android.messaging" />
+        <package android:name="com.google.android.GoogleCamera" />
+        <package android:name="com.motorola.camera3" />
+        <package android:name="com.motorola.camera2" />
+        <package android:name="com.android.camera2" />
+        <package android:name="com.android.camera" />
+    </queries>
+
     <application
         android:name=".AutomBotApp"
         android:allowBackup="false"
