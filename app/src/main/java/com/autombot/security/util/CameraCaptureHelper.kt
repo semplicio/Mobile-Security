@@ -16,6 +16,10 @@ import java.util.Locale
 
 class CameraCaptureHelper(private val context: Context) {
 
+    /**
+     * Captura uma sequência de fotos mantendo a mesma câmera vinculada durante
+     * toda a série. Isso evita o custo de abrir/fechar a câmera entre cada foto.
+     */
     fun capturePhotos(
         lifecycleOwner: LifecycleOwner,
         count: Int,
@@ -24,28 +28,82 @@ class CameraCaptureHelper(private val context: Context) {
         onError: (Throwable) -> Unit
     ) {
         val target = count.coerceIn(1, 5)
-        val captured = mutableListOf<File>()
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-        fun captureNext() {
-            if (captured.size >= target) {
-                onComplete(captured)
-                return
-            }
+        cameraProviderFuture.addListener({
+            try {
+                val provider = cameraProviderFuture.get()
+                val selector = CameraSelector.Builder()
+                    .requireLensFacing(lensFacing)
+                    .build()
 
-            capturePhoto(
-                lifecycleOwner = lifecycleOwner,
-                lensFacing = lensFacing,
-                onSuccess = {
-                    captured += it
-                    captureNext()
-                },
-                onError = {
-                    if (captured.isNotEmpty()) onComplete(captured) else onError(it)
+                if (!provider.hasCamera(selector)) {
+                    onError(IllegalStateException("Câmera solicitada não está disponível"))
+                    return@addListener
                 }
-            )
-        }
 
-        captureNext()
+                val imageCapture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setJpegQuality(82)
+                    .build()
+
+                provider.unbindAll()
+                provider.bindToLifecycle(
+                    lifecycleOwner,
+                    selector,
+                    imageCapture
+                )
+
+                val captured = mutableListOf<File>()
+                val outputDir = File(context.filesDir, "intrusion_photos").apply { mkdirs() }
+                val side = if (lensFacing == CameraSelector.LENS_FACING_BACK) "traseira" else "frontal"
+
+                fun finishSuccess() {
+                    provider.unbindAll()
+                    onComplete(captured.toList())
+                }
+
+                fun captureNext() {
+                    if (captured.size >= target) {
+                        finishSuccess()
+                        return
+                    }
+
+                    val photoFile = File(
+                        outputDir,
+                        "intruso_${side}_${timestamp()}_${System.nanoTime()}.jpg"
+                    )
+                    val outputOptions = OutputFileOptions.Builder(photoFile).build()
+
+                    imageCapture.takePicture(
+                        outputOptions,
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(output: OutputFileResults) {
+                                Log.i(TAG, "Foto capturada: ${photoFile.absolutePath}")
+                                captured += photoFile
+                                captureNext()
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                Log.e(TAG, "Erro ao capturar foto", exception)
+                                provider.unbindAll()
+                                if (captured.isNotEmpty()) {
+                                    onComplete(captured.toList())
+                                } else {
+                                    onError(exception)
+                                }
+                            }
+                        }
+                    )
+                }
+
+                captureNext()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Erro ao inicializar câmera", t)
+                onError(t)
+            }
+        }, ContextCompat.getMainExecutor(context))
     }
 
     fun capturePhoto(
@@ -54,61 +112,16 @@ class CameraCaptureHelper(private val context: Context) {
         onSuccess: (File) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
-        cameraProviderFuture.addListener({
-            try {
-                val cameraProvider = cameraProviderFuture.get()
-                val imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .build()
-
-                val selector = CameraSelector.Builder()
-                    .requireLensFacing(lensFacing)
-                    .build()
-
-                if (!cameraProvider.hasCamera(selector)) {
-                    onError(IllegalStateException("Câmera solicitada não está disponível"))
-                    return@addListener
-                }
-
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    selector,
-                    imageCapture
-                )
-
-                val outputDir = File(context.filesDir, "intrusion_photos").apply { mkdirs() }
-                val side = if (lensFacing == CameraSelector.LENS_FACING_BACK) "traseira" else "frontal"
-                val photoFile = File(
-                    outputDir,
-                    "intruso_${side}_${timestamp()}_${System.nanoTime()}.jpg"
-                )
-                val outputOptions = OutputFileOptions.Builder(photoFile).build()
-
-                imageCapture.takePicture(
-                    outputOptions,
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageSavedCallback {
-                        override fun onImageSaved(output: OutputFileResults) {
-                            Log.i(TAG, "Foto capturada: ${photoFile.absolutePath}")
-                            cameraProvider.unbindAll()
-                            onSuccess(photoFile)
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            Log.e(TAG, "Erro ao capturar foto", exception)
-                            cameraProvider.unbindAll()
-                            onError(exception)
-                        }
-                    }
-                )
-            } catch (t: Throwable) {
-                Log.e(TAG, "Erro ao inicializar câmera", t)
-                onError(t)
-            }
-        }, ContextCompat.getMainExecutor(context))
+        capturePhotos(
+            lifecycleOwner = lifecycleOwner,
+            count = 1,
+            lensFacing = lensFacing,
+            onComplete = { files ->
+                files.firstOrNull()?.let(onSuccess)
+                    ?: onError(IllegalStateException("Nenhuma foto foi gerada"))
+            },
+            onError = onError
+        )
     }
 
     private fun timestamp(): String =
