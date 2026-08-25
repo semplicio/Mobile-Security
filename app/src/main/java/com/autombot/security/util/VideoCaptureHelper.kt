@@ -23,8 +23,9 @@ import java.util.Locale
 
 class VideoCaptureHelper(private val context: Context) {
 
-    fun recordFiveSeconds(
+    fun recordFor(
         lifecycleOwner: LifecycleOwner,
+        durationMs: Long,
         withAudio: Boolean,
         lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
         onSuccess: (File) -> Unit,
@@ -57,7 +58,7 @@ class VideoCaptureHelper(private val context: Context) {
 
                 val outputDir = File(context.filesDir, "intrusion_video").apply { mkdirs() }
                 val side = if (lensFacing == CameraSelector.LENS_FACING_BACK) "traseira" else "frontal"
-                val file = File(outputDir, "video_${side}_${timestamp()}.mp4")
+                val file = File(outputDir, "video_${side}_${timestamp()}_${System.nanoTime()}.mp4")
                 val output = FileOutputOptions.Builder(file).build()
                 var pending = videoCapture.output.prepareRecording(context, output)
 
@@ -86,12 +87,27 @@ class VideoCaptureHelper(private val context: Context) {
 
                 Handler(Looper.getMainLooper()).postDelayed({
                     runCatching { recording?.stop() }
-                }, 5000L)
+                }, durationMs.coerceIn(1_500L, 5_000L))
             } catch (t: Throwable) {
                 onError(t)
             }
         }, ContextCompat.getMainExecutor(context))
     }
+
+    fun recordFiveSeconds(
+        lifecycleOwner: LifecycleOwner,
+        withAudio: Boolean,
+        lensFacing: Int = CameraSelector.LENS_FACING_FRONT,
+        onSuccess: (File) -> Unit,
+        onError: (Throwable) -> Unit
+    ) = recordFor(
+        lifecycleOwner = lifecycleOwner,
+        durationMs = 5_000L,
+        withAudio = withAudio,
+        lensFacing = lensFacing,
+        onSuccess = onSuccess,
+        onError = onError
+    )
 
     private fun timestamp(): String =
         SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
