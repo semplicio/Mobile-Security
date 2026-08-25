@@ -27,6 +27,15 @@ class GmailApiSender(
     private val prefs: PrefsManager
 ) {
 
+    fun resolveAuthorizedAccountEmail(
+        accessToken: String,
+        onResult: (String?) -> Unit
+    ) {
+        EXECUTOR.execute {
+            onResult(resolveSenderEmail(accessToken))
+        }
+    }
+
     fun sendIntrusionAlert(
         evidence: List<File>,
         mapsLink: String?,
@@ -34,10 +43,16 @@ class GmailApiSender(
         isTest: Boolean = false,
         onResult: (Boolean, String) -> Unit
     ) {
-        if (prefs.destinationEmail.isBlank()) {
-            onResult(false, "E-mail do proprietário não configurado")
+        val configuredAccount = prefs.googleAccountEmail.trim()
+        if (!isValidEmail(configuredAccount)) {
+            onResult(false, "Conta Google do proprietário não configurada")
             return
         }
+
+        // Desde a versão 0.1.11, o destino do alerta é sempre a própria Conta
+        // Google conectada pelo proprietário. Não existe mais um segundo campo
+        // de e-mail a ser preenchido manualmente.
+        prefs.destinationEmail = configuredAccount
 
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(requiredScopes())
@@ -72,6 +87,7 @@ class GmailApiSender(
                     }
 
                     prefs.googleAccountEmail = senderEmail
+                    prefs.destinationEmail = senderEmail
 
                     val sendResult = runCatching {
                         sendWithAccessToken(
@@ -223,13 +239,12 @@ class GmailApiSender(
     ): ByteArray {
         val validEvidence = evidence.filter { it.exists() && it.isFile }
         val photos = validEvidence.count { it.extension.equals("jpg", true) || it.extension.equals("jpeg", true) }
-        val audios = validEvidence.count { it.extension.equals("m4a", true) }
         val videos = validEvidence.count { it.extension.equals("mp4", true) }
 
         val session = Session.getInstance(Properties())
         val message = MimeMessage(session).apply {
             setFrom(InternetAddress(senderEmail))
-            setRecipients(Message.RecipientType.TO, InternetAddress.parse(prefs.destinationEmail))
+            setRecipients(Message.RecipientType.TO, InternetAddress.parse(senderEmail))
             subject = if (isTest) {
                 "AutomBot Security: teste de alerta"
             } else {
@@ -271,8 +286,8 @@ class GmailApiSender(
                 append("Captura de mídia não realizada automaticamente neste evento.\n")
             } else {
                 append("Fotos anexadas: $photos\n")
-                append("Áudios anexados: $audios\n")
                 append("Vídeos anexados: $videos\n")
+                append("O áudio, quando autorizado, é incorporado aos vídeos.\n")
             }
 
             append("\nMensagem automática do AutomBot Security.")
