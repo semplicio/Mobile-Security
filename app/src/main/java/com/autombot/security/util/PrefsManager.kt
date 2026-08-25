@@ -2,6 +2,11 @@ package com.autombot.security.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
+import java.security.MessageDigest
+import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 class PrefsManager(context: Context) {
     private val prefs: SharedPreferences =
@@ -78,9 +83,11 @@ class PrefsManager(context: Context) {
         get() = prefs.getString(KEY_SECURITY_MESSAGE, DEFAULT_SECURITY_MESSAGE) ?: DEFAULT_SECURITY_MESSAGE
         set(value) = prefs.edit().putString(KEY_SECURITY_MESSAGE, value.ifBlank { DEFAULT_SECURITY_MESSAGE }).apply()
 
+    // Mantido apenas para migração de instalações antigas. A versão atual não
+    // oferece gravação de áudio separada; o áudio é incorporado ao vídeo.
     var recordAudioEnabled: Boolean
-        get() = prefs.getBoolean(KEY_RECORD_AUDIO, false)
-        set(value) = prefs.edit().putBoolean(KEY_RECORD_AUDIO, value).apply()
+        get() = false
+        set(_) = prefs.edit().remove(KEY_RECORD_AUDIO).apply()
 
     var recordVideoEnabled: Boolean
         get() = prefs.getBoolean(KEY_RECORD_VIDEO, false)
@@ -109,9 +116,62 @@ class PrefsManager(context: Context) {
     }
 
     fun isGmailConfigured(): Boolean =
-        googleAccountConnected || googleAccountEmail.contains("@")
+        googleAccountConnected && googleAccountEmail.contains("@")
 
-    fun isEmailConfigured(): Boolean = destinationEmail.isNotBlank()
+    fun isEmailConfigured(): Boolean =
+        destinationEmail.isNotBlank() && destinationEmail.equals(googleAccountEmail, ignoreCase = true)
+
+    fun hasAppLockPassword(): Boolean =
+        !prefs.getString(KEY_APP_LOCK_HASH, "").isNullOrBlank() &&
+            !prefs.getString(KEY_APP_LOCK_SALT, "").isNullOrBlank()
+
+    fun setAppLockPassword(password: String) {
+        require(password.length >= MIN_APP_LOCK_LENGTH) {
+            "A senha precisa ter pelo menos $MIN_APP_LOCK_LENGTH caracteres"
+        }
+        val salt = ByteArray(APP_LOCK_SALT_BYTES).also { SecureRandom().nextBytes(it) }
+        val hash = derivePasswordHash(password, salt)
+        prefs.edit()
+            .putString(KEY_APP_LOCK_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
+            .putString(KEY_APP_LOCK_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun verifyAppLockPassword(password: String): Boolean {
+        val saltEncoded = prefs.getString(KEY_APP_LOCK_SALT, "").orEmpty()
+        val hashEncoded = prefs.getString(KEY_APP_LOCK_HASH, "").orEmpty()
+        if (saltEncoded.isBlank() || hashEncoded.isBlank()) return false
+
+        return runCatching {
+            val salt = Base64.decode(saltEncoded, Base64.NO_WRAP)
+            val expected = Base64.decode(hashEncoded, Base64.NO_WRAP)
+            val actual = derivePasswordHash(password, salt)
+            MessageDigest.isEqual(expected, actual)
+        }.getOrDefault(false)
+    }
+
+    fun clearAppLockPassword() {
+        prefs.edit()
+            .remove(KEY_APP_LOCK_SALT)
+            .remove(KEY_APP_LOCK_HASH)
+            .apply()
+    }
+
+    private fun derivePasswordHash(password: String, salt: ByteArray): ByteArray {
+        val spec = PBEKeySpec(
+            password.toCharArray(),
+            salt,
+            APP_LOCK_ITERATIONS,
+            APP_LOCK_KEY_BITS
+        )
+        return try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+                .generateSecret(spec)
+                .encoded
+        } finally {
+            spec.clearPassword()
+        }
+    }
 
     companion object {
         private const val PREFS_NAME = "autombot_security_prefs"
@@ -135,9 +195,16 @@ class PrefsManager(context: Context) {
         private const val KEY_RECORD_AUDIO = "record_audio_enabled"
         private const val KEY_RECORD_VIDEO = "record_video_enabled"
         private const val KEY_APP_LOCK = "app_lock_enabled"
+        private const val KEY_APP_LOCK_SALT = "app_lock_salt"
+        private const val KEY_APP_LOCK_HASH = "app_lock_hash"
         private const val KEY_EXPERIMENTAL_POWER = "experimental_power_protection"
         private const val KEY_EXPERIMENTAL_STATUS_BAR = "experimental_status_bar_block"
 
+        private const val APP_LOCK_SALT_BYTES = 16
+        private const val APP_LOCK_ITERATIONS = 120_000
+        private const val APP_LOCK_KEY_BITS = 256
+
+        const val MIN_APP_LOCK_LENGTH = 4
         const val TRANSPORT_GMAIL = "gmail_oauth"
         const val TRANSPORT_SMTP = "smtp_fallback"
         const val DEFAULT_THRESHOLD = 2
